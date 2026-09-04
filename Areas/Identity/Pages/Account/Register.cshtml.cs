@@ -75,6 +75,10 @@ public class RegisterModel : PageModel
     /// </summary>
     public class InputModel
     {
+        //Inserting FullName property to the InputModel class
+        [Required]
+        [Display(Name = "Full Name")]
+        public string FullName { get; set; } = default!;
         /// <summary>
         ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
         ///     directly from your code. This API may change or be removed in future releases.
@@ -118,6 +122,7 @@ public class RegisterModel : PageModel
         if (ModelState.IsValid)
         {
             var user = CreateUser();
+            user.FullName = Input.FullName;
 
             await _userStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
             await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
