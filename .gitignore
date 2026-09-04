@@ -480,3 +480,11 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# IDEs & Editor configs
+.vscode/
+.gemini/
+
+# Local cache & temporary session data
+session.json
+*.session

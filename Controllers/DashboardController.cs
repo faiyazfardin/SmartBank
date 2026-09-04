@@ -1,40 +1,46 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
-using SmartBank.Models;
-using System.Threading.Tasks;
 
 namespace SmartBank.Controllers
 {
     [Authorize]
     public class DashboardController : Controller
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly ApplicationDbContext _context;
+        private readonly SmartBankDbContext _context;
 
-        public DashboardController(UserManager<ApplicationUser> userManager, ApplicationDbContext context)
+        public DashboardController(SmartBankDbContext context)
         {
-            _userManager = userManager;
             _context = context;
         }
 
         public async Task<IActionResult> Index()
         {
-            var currentUser = await _userManager.GetUserAsync(User);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
 
-            if (currentUser == null)
+            if (!int.TryParse(userIdClaim, out var userId))
             {
-                return RedirectToAction("Login", "Account", new { area = "Identity" });
+                return RedirectToAction("Login", "Auth");
             }
 
-            var account = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
-            ViewBag.FullName = currentUser.FullName;
-            ViewBag.Email = currentUser.Email;
-            ViewBag.NID = currentUser.nID;
+            if (user == null)
+            {
+                return RedirectToAction("Login", "Auth");
+            }
+
+            var account = user.Accounts.FirstOrDefault();
+
+            ViewBag.FullName = user.FullName;
+            ViewBag.Email = user.Email;
+            ViewBag.Username = user.Username;
 
             return View(account);
         }

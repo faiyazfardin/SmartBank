@@ -1,14 +1,26 @@
-﻿@{
+@{
     ViewData["Title"] = "Dashboard";
-    var account = Model as SmartBank.Models.Account;
+    var account = Model as SmartBank.Entities.Account;
 }
 
-<h2>Welcome, @ViewBag.FullName</h2>
-<p class="text-muted">@ViewBag.Email</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2>Welcome, @ViewBag.FullName</h2>
+        <p class="text-muted mb-0">Email: <strong>@ViewBag.Email</strong> | Username: <strong>@ViewBag.Username</strong></p>
+    </div>
+</div>
+
+@if (TempData["Message"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+        @TempData["Message"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
 
 <div class="row mt-4">
     <div class="col-md-4">
-        <div class="card text-white bg-primary mb-3">
+        <div class="card text-white bg-primary mb-3 shadow-sm">
             <div class="card-header">Account Balance</div>
             <div class="card-body">
                 <h3 class="card-title">
@@ -26,24 +38,60 @@
     </div>
 
     <div class="col-md-4">
-        <div class="card mb-3">
+        <div class="card mb-3 shadow-sm">
             <div class="card-header">Account Number</div>
             <div class="card-body">
-                <h5 class="card-title">@(account?.AccountNumber ?? "N/A")</h5>
+                <h4 class="card-title text-monospace"><code>@(account?.AccountNumber ?? "N/A")</code></h4>
             </div>
         </div>
     </div>
 
     <div class="col-md-4">
-        <div class="card mb-3">
-            <div class="card-header">Status</div>
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header">Account Status</div>
             <div class="card-body">
                 @if (account != null)
                 {
-                    <span class="badge @(account.IsActive ? "bg-success" : "bg-danger")">
-                        @(account.IsActive ? "Active" : "Frozen")
-                    </span>
+                    <h4>
+                        <span class="badge @(account.IsActive ? "bg-success" : "bg-danger")">
+                            @(account.IsActive ? "Active" : "Frozen")
+                        </span>
+                    </h4>
                 }
+                else
+                {
+                    <span class="badge bg-secondary">No Account</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3 shadow-sm">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">Quick Operations</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">
+                <a asp-controller="Transaction" asp-action="Deposit" class="btn btn-outline-success w-100 py-3">
+                    <i class="bi bi-arrow-down-circle"></i> Deposit Money
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a asp-controller="Transaction" asp-action="Withdraw" class="btn btn-outline-danger w-100 py-3">
+                    <i class="bi bi-arrow-up-circle"></i> Withdraw Money
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a asp-controller="Transaction" asp-action="Transfer" class="btn btn-outline-warning w-100 py-3">
+                    <i class="bi bi-arrow-left-right"></i> Transfer Funds
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a asp-controller="Transaction" asp-action="History" class="btn btn-outline-info w-100 py-3">
+                    <i class="bi bi-clock-history"></i> View History
+                </a>
             </div>
         </div>
     </div>

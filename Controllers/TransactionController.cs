@@ -1,27 +1,34 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
-using SmartBank.Models;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using SmartBank.Entities;
 
 namespace SmartBank.Controllers
 {
     [Authorize]
     public class TransactionController : Controller
     {
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SmartBankDbContext _context;
 
-        public TransactionController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        public TransactionController(SmartBankDbContext context)
         {
             _context = context;
-            _userManager = userManager;
         }
 
-        //diposit
+        private int GetCurrentUserId()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+            return int.TryParse(claim, out var id) ? id : 0;
+        }
+
+        // Deposit
         [HttpGet]
         public IActionResult Deposit()
         {
@@ -37,8 +44,8 @@ namespace SmartBank.Controllers
                 return View();
             }
 
-            var currentUser = await _userManager.GetUserAsync(User);
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+            var userId = GetCurrentUserId();
+            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
 
             if (account == null)
             {
@@ -53,13 +60,14 @@ namespace SmartBank.Controllers
             }
 
             account.Balance += amount;
+            account.UpdatedAt = DateTime.UtcNow;
 
             var transaction = new Transaction
             {
                 AccountId = account.Id,
                 Type = TransactionType.Deposit,
                 Amount = amount,
-                Timestamp = System.DateTime.Now
+                Timestamp = DateTime.UtcNow
             };
 
             _context.Transactions.Add(transaction);
@@ -69,7 +77,7 @@ namespace SmartBank.Controllers
             return RedirectToAction("Index", "Dashboard");
         }
 
-        //withdraw
+        // Withdraw
         [HttpGet]
         public IActionResult Withdraw()
         {
@@ -85,8 +93,8 @@ namespace SmartBank.Controllers
                 return View();
             }
 
-            var currentUser = await _userManager.GetUserAsync(User);
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+            var userId = GetCurrentUserId();
+            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
 
             if (account == null)
             {
@@ -107,13 +115,14 @@ namespace SmartBank.Controllers
             }
 
             account.Balance -= amount;
+            account.UpdatedAt = DateTime.UtcNow;
 
             var transaction = new Transaction
             {
                 AccountId = account.Id,
                 Type = TransactionType.Withdraw,
                 Amount = amount,
-                Timestamp = System.DateTime.Now
+                Timestamp = DateTime.UtcNow
             };
 
             _context.Transactions.Add(transaction);
@@ -123,7 +132,7 @@ namespace SmartBank.Controllers
             return RedirectToAction("Index", "Dashboard");
         }
 
-        //Money transfer
+        // Transfer
         [HttpGet]
         public IActionResult Transfer()
         {
@@ -139,8 +148,8 @@ namespace SmartBank.Controllers
                 return View();
             }
 
-            var currentUser = await _userManager.GetUserAsync(User);
-            var senderAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+            var userId = GetCurrentUserId();
+            var senderAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
 
             if (senderAccount == null)
             {
@@ -155,11 +164,17 @@ namespace SmartBank.Controllers
             }
 
             var recipientAccount = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.AccountNumber == recipientAccountNumber);
+                .FirstOrDefaultAsync(a => a.AccountNumber == recipientAccountNumber.Trim());
 
             if (recipientAccount == null)
             {
                 ModelState.AddModelError("", "Recipient account not found.");
+                return View();
+            }
+
+            if (!recipientAccount.IsActive)
+            {
+                ModelState.AddModelError("", "The recipient's account is currently frozen and cannot receive funds.");
                 return View();
             }
 
@@ -175,41 +190,55 @@ namespace SmartBank.Controllers
                 return View();
             }
 
-            senderAccount.Balance -= amount;
-            recipientAccount.Balance += amount;
-
-            var outgoing = new Transaction
+            using var dbTransaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                AccountId = senderAccount.Id,
-                Type = TransactionType.TransferOut,
-                Amount = amount,
-                Timestamp = System.DateTime.Now,
-                RelatedAccountId = recipientAccount.Id
-            };
+                senderAccount.Balance -= amount;
+                senderAccount.UpdatedAt = DateTime.UtcNow;
 
-            var incoming = new Transaction
+                recipientAccount.Balance += amount;
+                recipientAccount.UpdatedAt = DateTime.UtcNow;
+
+                var outgoing = new Transaction
+                {
+                    AccountId = senderAccount.Id,
+                    Type = TransactionType.TransferOut,
+                    Amount = amount,
+                    Timestamp = DateTime.UtcNow,
+                    RelatedAccountId = recipientAccount.Id
+                };
+
+                var incoming = new Transaction
+                {
+                    AccountId = recipientAccount.Id,
+                    Type = TransactionType.TransferIn,
+                    Amount = amount,
+                    Timestamp = DateTime.UtcNow,
+                    RelatedAccountId = senderAccount.Id
+                };
+
+                _context.Transactions.Add(outgoing);
+                _context.Transactions.Add(incoming);
+                await _context.SaveChangesAsync();
+                await dbTransaction.CommitAsync();
+
+                TempData["Message"] = $"Successfully transferred {amount:C} to account {recipientAccountNumber}.";
+                return RedirectToAction("Index", "Dashboard");
+            }
+            catch (Exception ex)
             {
-                AccountId = recipientAccount.Id,
-                Type = TransactionType.TransferIn,
-                Amount = amount,
-                Timestamp = System.DateTime.Now,
-                RelatedAccountId = senderAccount.Id
-            };
-
-            _context.Transactions.Add(outgoing);
-            _context.Transactions.Add(incoming);
-            await _context.SaveChangesAsync();
-
-            TempData["Message"] = $"Successfully transferred {amount:C} to account {recipientAccountNumber}.";
-            return RedirectToAction("Index", "Dashboard");
+                await dbTransaction.RollbackAsync();
+                ModelState.AddModelError("", $"Transfer failed: {ex.Message}");
+                return View();
+            }
         }
 
-        //Free king History
+        // History
         [HttpGet]
         public async Task<IActionResult> History()
         {
-            var currentUser = await _userManager.GetUserAsync(User);
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+            var userId = GetCurrentUserId();
+            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
 
             if (account == null)
             {
