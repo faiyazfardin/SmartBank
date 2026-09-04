@@ -1,0 +1,50 @@
+﻿@{
+    ViewData["Title"] = "Dashboard";
+    var account = Model as SmartBank.Models.Account;
+}
+
+<h2>Welcome, @ViewBag.FullName</h2>
+<p class="text-muted">@ViewBag.Email</p>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-header">Account Balance</div>
+            <div class="card-body">
+                <h3 class="card-title">
+                    @if (account != null)
+                    {
+                        @account.Balance.ToString("C")
+                    }
+                    else
+                    {
+                        <span>No account found</span>
+                    }
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">Account Number</div>
+            <div class="card-body">
+                <h5 class="card-title">@(account?.AccountNumber ?? "N/A")</h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">Status</div>
+            <div class="card-body">
+                @if (account != null)
+                {
+                    <span class="badge @(account.IsActive ? "bg-success" : "bg-danger")">
+                        @(account.IsActive ? "Active" : "Frozen")
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
