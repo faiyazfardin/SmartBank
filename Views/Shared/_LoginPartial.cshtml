@@ -1,37 +1,29 @@
-﻿@using Microsoft.AspNetCore.Identity
-@inject SignInManager<ApplicationUser> SignInManager
-@inject UserManager<ApplicationUser> UserManager
-@using SmartBank.Models
-@{
-    var currentUser = await UserManager.GetUserAsync(User);
-}
+@using System.Security.Claims
 
 <ul class="navbar-nav">
-@if (SignInManager.IsSignedIn(User))
+@if (User.Identity != null && User.Identity.IsAuthenticated)
 {   
+    @if (User.IsInRole("Admin"))
+    {
+        <li class="nav-item">
+            <a class="nav-link text-danger fw-bold" asp-area="" asp-controller="Admin" asp-action="Users">Admin Panel</a>
+        </li>
+    }
     <li class="nav-item">
-    <a class="nav-link text-dark" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+        <a class="nav-link text-dark" asp-area="" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
     </li>
-    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Deposit">Deposit</a></li>
-    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Withdraw">Withdraw</a></li>
-    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Transfer">Transfer</a></li>
-    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="History">History</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-area="" asp-controller="Transaction" asp-action="Deposit">Deposit</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-area="" asp-controller="Transaction" asp-action="Withdraw">Withdraw</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-area="" asp-controller="Transaction" asp-action="Transfer">Transfer</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-area="" asp-controller="Transaction" asp-action="History">History</a></li>
     <li class="nav-item">
-        <a  class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage">Hello, @currentUser.FullName!</a>
-    </li>
-    <li class="nav-item">
-        <form  class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })">
-            <button  type="submit" class="nav-link btn btn-link text-dark">Logout</button>
-        </form>
+        <span class="nav-link text-dark">Hello, @(User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "User")!</span>
     </li>
 }
 else
 {
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Register">Register</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Login">Login</a>
+        <a class="nav-link text-dark" href="/swagger">Swagger API Docs</a>
     </li>
 }
 </ul>

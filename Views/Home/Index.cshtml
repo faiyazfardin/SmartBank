@@ -1,8 +1,45 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="p-5 mb-4 bg-light rounded-3 shadow-sm border">
+    <div class="container-fluid py-4">
+        <h1 class="display-5 fw-bold text-primary">Welcome to SmartBank</h1>
+        <p class="col-md-8 fs-5 text-secondary">
+            Your secure, fast, and modern digital banking system. Powered by ASP.NET Core Web API, PostgreSQL/Neon, JWT Bearer authentication, and Windows Forms Desktop Client.
+        </p>
+        <div class="d-flex gap-3 mt-4">
+            <a href="/swagger" class="btn btn-primary btn-lg">🚀 Open Swagger API Docs</a>
+        </div>
+    </div>
+</div>
+
+<div class="row align-items-md-stretch g-4">
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4>⚡ Instant Deposits & Withdrawals</h4>
+            <p class="text-muted">Deposit funds and withdraw money securely in real-time with automatic balance calculation and full audit trail.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4>🔄 Account-to-Account Transfers</h4>
+            <p class="text-muted">Easily transfer funds to any other account number within SmartBank with validation against insufficient funds and frozen status.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
+            <h4>🛡️ Admin Control & Security</h4>
+            <p class="text-muted">BCrypt password hashing (factor 12), IP rate limiting, account lockout after 5 failed attempts, and JWT authorization.</p>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-secondary mt-4">
+    <h6 class="fw-bold mb-1">🔑 Demo / Default Admin Credentials</h6>
+    <div class="small">
+        <span>Username: <code>admin</code></span> | 
+        <span>Email: <code>admin@smartbank.com</code></span> | 
+        <span>Password: <code>@@Dmin12</code></span>
+    </div>
 </div>

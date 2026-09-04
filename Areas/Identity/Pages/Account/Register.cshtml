@@ -18,6 +18,12 @@
                 <label asp-for="Input.FullName" class="form-label">Full Name</label>
                 <span asp-validation-for="Input.FullName" class="text-danger"></span>
             </div>
+            @* National ID (nID) field *@
+            <div class="form-floating mb-3">
+                <input asp-for="Input.nID" class="form-control" placeholder="National ID" />
+                <label asp-for="Input.nID" class="form-label">National ID (NID)</label>
+                <span asp-validation-for="Input.nID" class="text-danger"></span>
+            </div>
             @* Email field *@
             <div class="form-floating mb-3">
                 <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />

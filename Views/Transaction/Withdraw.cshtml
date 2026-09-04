@@ -1,27 +1,35 @@
-﻿@{
-    ViewData["Title"] = "Withdraw";
+@{
+    ViewData["Title"] = "Withdraw Funds";
 }
 
-<h2>Withdraw Money</h2>
-
-<div class="row">
+<div class="row justify-content-center">
     <div class="col-md-6">
-        @if (!ViewData.ModelState.IsValid)
-        {
-            <div class="alert alert-danger">
-                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">Withdraw Funds</h4>
+            </div>
+            <div class="card-body p-4">
+                @if (!ViewData.ModelState.IsValid)
                 {
-                    <p class="mb-0">@error.ErrorMessage</p>
+                    <div class="alert alert-danger">
+                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                        {
+                            <p class="mb-0">@error.ErrorMessage</p>
+                        }
+                    </div>
                 }
-            </div>
-        }
 
-        <form asp-controller="Transaction" asp-action="Withdraw" method="post">
-            <div class="form-floating mb-3">
-                <input type="number" step="0.01" name="amount" class="form-control" placeholder="0.00" required />
-                <label>Amount to Withdraw</label>
+                <form asp-controller="Transaction" asp-action="Withdraw" method="post">
+                    <div class="form-floating mb-3">
+                        <input type="number" step="0.01" min="1" name="amount" class="form-control" placeholder="0.00" required />
+                        <label>Amount to Withdraw (৳)</label>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary">Back to Dashboard</a>
+                        <button type="submit" class="btn btn-danger">Confirm Withdrawal</button>
+                    </div>
+                </form>
             </div>
-            <button type="submit" class="btn btn-danger">Withdraw</button>
-        </form>
+        </div>
     </div>
 </div>
