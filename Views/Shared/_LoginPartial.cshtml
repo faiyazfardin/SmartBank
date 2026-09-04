@@ -12,6 +12,10 @@
     <li class="nav-item">
     <a class="nav-link text-dark" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
     </li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Deposit">Deposit</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Withdraw">Withdraw</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="Transfer">Transfer</a></li>
+    <li class="nav-item"><a class="nav-link text-dark" asp-controller="Transaction" asp-action="History">History</a></li>
     <li class="nav-item">
         <a  class="nav-link text-dark" asp-area="Identity" asp-page="/Account/Manage/Index" title="Manage">Hello, @currentUser.FullName!</a>
     </li>

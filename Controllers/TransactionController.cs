@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
 using SmartBank.Models;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace SmartBank.Controllers
 {
@@ -108,6 +109,101 @@ namespace SmartBank.Controllers
 
             TempData["Message"] = $"Successfully withdrew {amount:C}.";
             return RedirectToAction("Index", "Dashboard");
+        }
+
+        //Money transfer
+        [HttpGet]
+        public IActionResult Transfer()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount)
+        {
+            if (amount <= 0)
+            {
+                ModelState.AddModelError("", "Transfer amount must be greater than zero.");
+                return View();
+            }
+
+            var currentUser = await _userManager.GetUserAsync(User);
+            var senderAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+
+            if (senderAccount == null)
+            {
+                ModelState.AddModelError("", "No account found.");
+                return View();
+            }
+
+            var recipientAccount = await _context.Accounts
+                .FirstOrDefaultAsync(a => a.AccountNumber == recipientAccountNumber);
+
+            if (recipientAccount == null)
+            {
+                ModelState.AddModelError("", "Recipient account not found.");
+                return View();
+            }
+
+            if (recipientAccount.Id == senderAccount.Id)
+            {
+                ModelState.AddModelError("", "You cannot transfer to your own account.");
+                return View();
+            }
+
+            if (amount > senderAccount.Balance)
+            {
+                ModelState.AddModelError("", "Insufficient funds.");
+                return View();
+            }
+
+            senderAccount.Balance -= amount;
+            recipientAccount.Balance += amount;
+
+            var outgoing = new Transaction
+            {
+                AccountId = senderAccount.Id,
+                Type = TransactionType.TransferOut,
+                Amount = amount,
+                Timestamp = System.DateTime.Now,
+                RelatedAccountId = recipientAccount.Id
+            };
+
+            var incoming = new Transaction
+            {
+                AccountId = recipientAccount.Id,
+                Type = TransactionType.TransferIn,
+                Amount = amount,
+                Timestamp = System.DateTime.Now,
+                RelatedAccountId = senderAccount.Id
+            };
+
+            _context.Transactions.Add(outgoing);
+            _context.Transactions.Add(incoming);
+            await _context.SaveChangesAsync();
+
+            TempData["Message"] = $"Successfully transferred {amount:C} to account {recipientAccountNumber}.";
+            return RedirectToAction("Index", "Dashboard");
+        }
+
+        //Free king History
+        [HttpGet]
+        public async Task<IActionResult> History()
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == currentUser.Id);
+
+            if (account == null)
+            {
+                return View(new List<Transaction>());
+            }
+
+            var transactions = await _context.Transactions
+                .Where(t => t.AccountId == account.Id)
+                .OrderByDescending(t => t.Timestamp)
+                .ToListAsync();
+
+            return View(transactions);
         }
     }
 }
