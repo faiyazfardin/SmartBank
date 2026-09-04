@@ -1,0 +1,76 @@
+﻿@model List<SmartBank.Models.ApplicationUser>
+
+@{
+    ViewData["Title"] = "All Users";
+}
+
+<h2>All Users</h2>
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>National ID</th>
+            <th>Account Number</th>
+            <th>Balance</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model)
+        {
+            var account = user.Accounts.FirstOrDefault();
+            <tr>
+                <td>@user.FullName</td>
+                <td>@user.Email</td>
+                <td>@user.nID</td>
+                <td>@(account?.AccountNumber ?? "No account")</td>
+                <td>@(account != null ? account.Balance.ToString("C") : "-")</td>
+                <td>
+                    @if (account != null)
+                    {
+                        <span class="badge @(account.IsActive ? "bg-success" : "bg-danger")">
+                            @(account.IsActive ? "Active" : "Frozen")
+                        </span>
+                    }
+                </td>
+
+                <td>
+                    @if (account != null)
+                    {
+                        <form asp-controller="Admin" asp-action="ToggleAccountStatus" method="post" class="d-inline">
+                            <input type="hidden" name="accountId" value="@account.Id" />
+                            <button type="submit" class="btn btn-sm @(account.IsActive ? "btn-outline-danger" : "btn-outline-success")">
+                                @(account.IsActive ? "Freeze" : "Activate")
+                            </button>
+                        </form>
+                    }
+                </td>
+
+                
+                <td>
+                    @if (account != null)
+                    {
+                        <form asp-controller="Admin" asp-action="ToggleAccountStatus" method="post" class="d-inline">
+                            <input type="hidden" name="accountId" value="@account.Id" />
+                            <button type="submit" class="btn btn-sm @(account.IsActive ? "btn-outline-danger" : "btn-outline-success")">
+                                @(account.IsActive ? "Freeze" : "Activate")
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-controller="Admin" asp-action="CreateAccount" method="post" class="d-inline">
+                            <input type="hidden" name="userId" value="@user.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Create Account</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+            
+
+        }
+    </tbody>
+</table>

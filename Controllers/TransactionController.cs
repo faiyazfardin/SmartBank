@@ -46,6 +46,12 @@ namespace SmartBank.Controllers
                 return View();
             }
 
+            if (!account.IsActive)
+            {
+                ModelState.AddModelError("", "This account is frozen. Contact support.");
+                return View();
+            }
+
             account.Balance += amount;
 
             var transaction = new Transaction
@@ -85,6 +91,12 @@ namespace SmartBank.Controllers
             if (account == null)
             {
                 ModelState.AddModelError("", "No account found.");
+                return View();
+            }
+
+            if (!account.IsActive)
+            {
+                ModelState.AddModelError("", "This account is frozen. Contact support.");
                 return View();
             }
 
@@ -133,6 +145,12 @@ namespace SmartBank.Controllers
             if (senderAccount == null)
             {
                 ModelState.AddModelError("", "No account found.");
+                return View();
+            }
+
+            if (!senderAccount.IsActive)
+            {
+                ModelState.AddModelError("", "Your account is frozen. Contact support.");
                 return View();
             }
 
