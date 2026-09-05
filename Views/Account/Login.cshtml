@@ -1,0 +1,123 @@
+@{
+    ViewData["Title"] = "Sign In — SmartBank";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<div class="auth-wrapper">
+    <div class="auth-card-pro">
+        <!-- Brand Header -->
+        <div class="text-center mb-4">
+            <div class="brand-icon-box mx-auto mb-3 shadow-glow" style="width: 52px; height: 52px; font-size: 1.5rem;">
+                <i class="bi bi-shield-lock-fill"></i>
+            </div>
+            <h2 class="fw-extrabold text-white mb-1 tracking-tight">Welcome Back</h2>
+            <p class="text-secondary small mb-0">Sign in to your SmartBank command center</p>
+        </div>
+
+        @if (TempData["SuccessToast"] != null)
+        {
+            <div class="alert alert-success bg-success bg-opacity-10 border border-success border-opacity-30 text-success alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                <div class="small fw-semibold text-white">@TempData["SuccessToast"]</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                <div class="small fw-semibold">@ViewBag.Error</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form asp-controller="Account" asp-action="Login" method="post" asp-route-returnUrl="@returnUrl">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Username</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-person text-info"></i></span>
+                    <input type="text" id="inputIdentifier" name="identifier" class="form-control" placeholder="Username" required autofocus />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-0">Password</label>
+                </div>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-key text-warning"></i></span>
+                    <input type="password" id="inputPassword" name="password" class="form-control" placeholder="Password" required />
+                    <button class="btn btn-outline-secondary toggle-password-btn" type="button" data-target="inputPassword">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="form-check">
+                    <input class="form-check-input bg-dark border-secondary" type="checkbox" id="rememberMe" name="rememberMe" value="true">
+                    <label class="form-check-label small text-secondary" for="rememberMe">
+                        Keep me signed in
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" id="submitLoginBtn" class="btn-cta-primary w-100 py-2-5 fw-bold shadow-glow mb-4">
+                <i class="bi bi-box-arrow-in-right me-2"></i> Sign In to Account
+            </button>
+        </form>
+
+        <!-- Quick Demo Admin Fill Pill -->
+        <div class="p-3 rounded-3 mb-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-white"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Quick Demo Admin</span>
+                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-25" style="font-size: 0.65rem;">DEMO READY</span>
+            </div>
+            <div class="d-grid">
+                <button type="button" class="btn btn-sm btn-dark text-start d-flex justify-content-between align-items-center border border-secondary border-opacity-25 py-2 px-3 rounded-2" onclick="fillCredentials('admin', '@@Dmin12')">
+                    <span class="text-secondary small font-monospace"><i class="bi bi-shield-check text-success me-1"></i> admin / @@Dmin12</span>
+                    <span class="badge bg-primary text-white rounded-pill px-2 py-1">Auto Fill</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="text-center pt-3 border-top border-secondary border-opacity-20">
+            <p class="text-secondary small mb-0">
+                Don't have an account yet? 
+                <a asp-controller="Account" asp-action="Register" class="fw-bold text-info text-decoration-none ms-1">Register Now</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let isLoginSubmitting = false;
+    const loginForm = document.querySelector('form');
+    const loginBtn = document.getElementById('submitLoginBtn');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            if (isLoginSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            isLoginSubmitting = true;
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.style.pointerEvents = 'none';
+                loginBtn.style.opacity = '0.85';
+                loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Signing In...';
+            }
+        });
+    }
+
+    function fillCredentials(id, pass) {
+        document.getElementById('inputIdentifier').value = id;
+        document.getElementById('inputPassword').value = pass;
+    }
+</script>
+}

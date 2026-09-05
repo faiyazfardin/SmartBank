@@ -1,163 +1,848 @@
 @model List<SmartBank.Entities.User>
-
 @{
-    ViewData["Title"] = "All Users";
+    ViewData["Title"] = "Admin Command Center";
+    int totalUsers = ViewBag.TotalUsers ?? 0;
+    int totalAccounts = ViewBag.TotalAccounts ?? 0;
+    decimal totalSystemBalance = ViewBag.TotalSystemBalance ?? 0m;
+    int totalTransactionsCount = ViewBag.TotalTransactionsCount ?? 0;
+    decimal totalTransactionVolume = ViewBag.TotalTransactionVolume ?? 0m;
+    int suspendedUsersCount = ViewBag.SuspendedUsersCount ?? 0;
+    int pendingUsersCount = ViewBag.PendingUsersCount ?? 0;
+    var pendingUsers = ViewBag.PendingUsers as List<SmartBank.Entities.User> ?? new List<SmartBank.Entities.User>();
+    var auditTransactions = ViewBag.AuditTransactions as List<SmartBank.Entities.Transaction> ?? new List<SmartBank.Entities.Transaction>();
+
+    string search = ViewBag.Search as string ?? "";
+    string roleFilter = ViewBag.RoleFilter as string ?? "";
+    string statusFilter = ViewBag.StatusFilter as string ?? "";
+
+    // Vibrant Avatar Gradient Array
+    string[] avatarGradients = new[] {
+        "linear-gradient(135deg, #6366f1, #8b5cf6)",
+        "linear-gradient(135deg, #ec4899, #f43f5e)",
+        "linear-gradient(135deg, #10b981, #06b6d4)",
+        "linear-gradient(135deg, #f59e0b, #ea580c)",
+        "linear-gradient(135deg, #8b5cf6, #3b82f6)",
+        "linear-gradient(135deg, #14b8a6, #0284c7)"
+    };
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>User Management</h2>
-    <span class="badge bg-primary fs-6">Total Users: @Model.Count</span>
-</div>
-
-@if (TempData["Message"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @TempData["Message"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div class="container-fluid px-lg-5 py-4">
+    <!-- Top Header -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4 pb-3 border-bottom">
+        <h3 class="fw-extrabold text-dark mb-0">Admin Command Center</h3>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-dark rounded-pill px-3 shadow-sm d-inline-flex align-items-center gap-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#auditLogModal" style="background: #1e293b; border-color: #334155;">
+                <i class="bi bi-journal-code text-info"></i>
+                <span>Audit Log</span>
+            </button>
+            <button type="button" class="btn text-white rounded-pill px-4 fw-bold shadow d-inline-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createUserModal" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none;">
+                <i class="bi bi-person-plus-fill"></i>
+                <span>+ Create User</span>
+            </button>
+        </div>
     </div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @TempData["Error"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+
+    <!-- Colorful Clean KPI Metrics Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Card 1: Users -->
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-widget rounded-4 p-3 h-100 d-flex align-items-center" style="border-left: 4px solid #6366f1 !important;">
+                <div class="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                    <i class="bi bi-people-fill fs-4"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Total Users</div>
+                    <div class="fs-3 fw-extrabold text-white mt-1">@totalUsers.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: KYC Approvals -->
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-widget rounded-4 p-3 h-100 d-flex align-items-center" style="border-left: 4px solid #f59e0b !important;">
+                <div class="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, #f59e0b, #ea580c);">
+                    <i class="bi bi-person-vcard-fill fs-4"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">KYC Queue</div>
+                    <div class="fs-3 fw-extrabold text-warning mt-1">@pendingUsersCount.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Vault Balance -->
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-widget rounded-4 p-3 h-100 d-flex align-items-center" style="border-left: 4px solid #10b981 !important;">
+                <div class="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, #10b981, #06b6d4);">
+                    <i class="bi bi-safe2-fill fs-4"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Vault Assets</div>
+                    <div class="fs-3 fw-extrabold text-success mt-1">৳@totalSystemBalance.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Volume -->
+        <div class="col-sm-6 col-xl-3">
+            <div class="stat-widget rounded-4 p-3 h-100 d-flex align-items-center" style="border-left: 4px solid #8b5cf6 !important;">
+                <div class="rounded-4 d-flex align-items-center justify-content-center text-white shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, #8b5cf6, #ec4899);">
+                    <i class="bi bi-arrow-left-right fs-4"></i>
+                </div>
+                <div class="ms-3">
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">Volume</div>
+                    <div class="fs-3 fw-extrabold text-info mt-1">৳@totalTransactionVolume.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
     </div>
-}
 
-<div class="table-responsive">
-    <table class="table table-striped table-hover mt-2 align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Full Name</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Account Number</th>
-                <th>Balance</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var user in Model)
-            {
-                var account = user.Accounts.FirstOrDefault();
-                <tr>
-                    <td><strong>@user.FullName</strong></td>
-                    <td>@user.Username</td>
-                    <td>@user.Email</td>
-                    <td>@(user.PhoneNumber ?? "-")</td>
-                    <td><span class="badge @(user.Role == "Admin" ? "bg-danger" : "bg-info")">@user.Role</span></td>
-                    <td><code>@(account?.AccountNumber ?? "No account")</code></td>
-                    <td>@(account != null ? account.Balance.ToString("C") : "-")</td>
-                    <td>
-                        @if (account != null)
-                        {
-                            <span class="badge @(account.IsActive ? "bg-success" : "bg-danger")">
-                                @(account.IsActive ? "Active" : "Frozen")
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-secondary">No Account</span>
-                        }
-                    </td>
+    <!-- Pending Registration / NID Review Requests Section (Rendered when pending requests exist) -->
+    @if (pendingUsers != null && pendingUsers.Any())
+    {
+        <div class="sb-card mb-4 rounded-4 overflow-hidden" style="border: 1px solid rgba(245, 158, 11, 0.35) !important;">
+            <div class="d-flex align-items-center justify-content-between p-3" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%); border-bottom: 1px solid rgba(245, 158, 11, 0.2);">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center text-white shadow-sm" style="width: 32px; height: 32px; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                        <i class="bi bi-person-vcard fs-6"></i>
+                    </span>
+                    <h5 class="fw-bold mb-0 text-white">KYC Registration & NID Approval Requests</h5>
+                </div>
+                <span class="badge rounded-pill px-3 py-1-5 fw-bold shadow-sm text-white" style="background: linear-gradient(135deg, #f59e0b, #ea580c);">
+                    @pendingUsers.Count Pending
+                </span>
+            </div>
 
-                    <td>
-                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal-@user.Id">
-                            ✏️ Edit
-                        </button>
-
-                        @if (account != null)
+            <div class="table-responsive">
+                <table class="table sb-table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Applicant</th>
+                            <th>Contact</th>
+                            <th>National ID (NID)</th>
+                            <th>Submitted</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < pendingUsers.Count; i++)
                         {
-                            <form asp-controller="Admin" asp-action="ToggleAccountStatus" method="post" class="d-inline">
-                                <input type="hidden" name="accountId" value="@account.Id" />
-                                <button type="submit" class="btn btn-sm @(account.IsActive ? "btn-outline-danger" : "btn-outline-success")">
-                                    @(account.IsActive ? "Freeze" : "Activate")
-                                </button>
-                            </form>
-                        }
-                        else
-                        {
-                            <form asp-controller="Admin" asp-action="CreateAccount" method="post" class="d-inline">
-                                <input type="hidden" name="userId" value="@user.Id" />
-                                <button type="submit" class="btn btn-sm btn-outline-primary">Create Account</button>
-                            </form>
-                        }
-                    </td>
-                </tr>
-
-                <!-- Edit Modal -->
-                <div class="modal fade" id="editModal-@user.Id" tabindex="-1" aria-labelledby="editModalLabel-@user.Id" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <form asp-controller="Admin" asp-action="EditUser" method="post">
-                                <input type="hidden" name="userId" value="@user.Id" />
-                                <div class="modal-header bg-dark text-white">
-                                    <h5 class="modal-title" id="editModalLabel-@user.Id">Edit User: @user.FullName</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold">Full Name</label>
-                                        <input type="text" name="fullName" class="form-control" value="@user.FullName" required />
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Username</label>
-                                            <input type="text" name="username" class="form-control" value="@user.Username" required />
+                            var p = pendingUsers[i];
+                            var pAcc = p.Accounts.FirstOrDefault();
+                            var grad = avatarGradients[i % avatarGradients.Length];
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 38px; height: 38px; background: @grad;">
+                                            @(p.FullName.Length > 0 ? p.FullName.Substring(0, 1).ToUpper() : "U")
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Role</label>
-                                            <select name="role" class="form-select">
-                                                <option value="Customer" selected="@(user.Role == "Customer")">Customer</option>
-                                                <option value="Admin" selected="@(user.Role == "Admin")">Admin</option>
-                                            </select>
+                                        <div>
+                                            <div class="fw-bold text-dark">@p.FullName</div>
+                                            <div class="text-muted small font-monospace">@@@p.Username</div>
                                         </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Email Address</label>
-                                            <input type="email" name="email" class="form-control" value="@user.Email" required />
+                                </td>
+                                <td>
+                                    <div class="small text-dark fw-semibold">@p.Email</div>
+                                    <div class="text-muted small">@(p.PhoneNumber ?? "—")</div>
+                                </td>
+                                <td>
+                                    <span class="badge rounded-pill px-3 py-1 font-monospace fw-bold shadow-sm" style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.45) !important; color: #fbbf24 !important; font-size: 0.85rem;">
+                                        <i class="bi bi-card-heading me-1 text-warning"></i>@(p.NidNumber ?? "Not Provided")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="small text-dark fw-semibold">@p.CreatedAt.ToString("MMM dd, yyyy")</div>
+                                    <div class="text-muted small">@p.CreatedAt.ToString("hh:mm tt") UTC</div>
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-2">
+                                        <!-- Approve Form -->
+                                        <form asp-controller="Admin" asp-action="ApproveUser" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@p.Id" />
+                                            <button type="submit" class="btn btn-sm text-white fw-bold rounded-pill px-3 shadow-sm d-inline-flex align-items-center gap-1" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                <span>Approve</span>
+                                            </button>
+                                        </form>
+
+                                        <!-- Reject Form -->
+                                        <form asp-controller="Admin" asp-action="RejectUser" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userId" value="@p.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-warning fw-semibold rounded-pill px-3" title="Reject Request">
+                                                <i class="bi bi-x-circle me-1"></i> Reject
+                                            </button>
+                                        </form>
+
+                                        <!-- Delete Trigger Button -->
+                                        <button type="button" class="btn btn-sm btn-outline-danger fw-semibold rounded-pill px-3" title="Delete Applicant Request"
+                                                onclick="openDeleteModal(@p.Id, '@p.FullName', '@p.Username', '@p.Role', '@(p.NidNumber ?? "")', '@(pAcc?.AccountNumber ?? "")', @(pAcc?.Balance ?? 0))">
+                                            <i class="bi bi-trash3 me-1"></i> Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Filter & Search Bar -->
+    <div class="sb-card p-3 mb-4 rounded-4">
+        <form asp-controller="Admin" asp-action="Users" method="get" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 rounded-start-pill"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-start-0 rounded-end-pill" placeholder="Search by name, username, email, phone, NID or account number..." value="@search" />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="roleFilter" class="form-select rounded-pill">
+                    <option value="">All Roles</option>
+                    <option value="Customer" selected="@(roleFilter == "Customer")">Customer Accounts</option>
+                    <option value="Admin" selected="@(roleFilter == "Admin")">Admin Accounts</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="statusFilter" class="form-select rounded-pill">
+                    <option value="">All Statuses</option>
+                    <option value="Active" selected="@(statusFilter == "Active")">Active</option>
+                    <option value="Pending" selected="@(statusFilter == "Pending")">Pending</option>
+                    <option value="Suspended" selected="@(statusFilter == "Suspended")">Suspended</option>
+                    <option value="Rejected" selected="@(statusFilter == "Rejected")">Rejected</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn text-white w-100 fw-bold rounded-pill shadow-sm" style="background: linear-gradient(135deg, #4f46e5, #6366f1); border: none;">
+                    <i class="bi bi-filter me-1"></i> Filter
+                </button>
+                @if (!string.IsNullOrEmpty(search) || !string.IsNullOrEmpty(roleFilter) || !string.IsNullOrEmpty(statusFilter))
+                {
+                    <a asp-controller="Admin" asp-action="Users" class="btn btn-outline-secondary rounded-pill" title="Clear Filters">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Users Directory Data Table -->
+    <div class="sb-card p-0 overflow-hidden rounded-4">
+        <div class="p-3 bg-light d-flex align-items-center justify-content-between border-bottom">
+            <h5 class="fw-bold text-white mb-0">User Directory</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table sb-table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>User Profile</th>
+                        <th>Contact</th>
+                        <th>NID Number</th>
+                        <th>Role</th>
+                        <th>Account #</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            var u = Model[i];
+                            var acc = u.Accounts.FirstOrDefault();
+                            var isLocked = u.LockedUntil.HasValue && u.LockedUntil.Value > DateTime.UtcNow;
+                            var isSuspended = u.Status?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true;
+                            var isPending = u.Status?.Equals("Pending", StringComparison.OrdinalIgnoreCase) == true;
+                            var isRejected = u.Status?.Equals("Rejected", StringComparison.OrdinalIgnoreCase) == true;
+                            var grad = u.Role == "Admin" ? "linear-gradient(135deg, #ef4444, #dc2626)" : avatarGradients[i % avatarGradients.Length];
+
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 40px; height: 40px; background: @grad;">
+                                            @(u.FullName.Length > 0 ? u.FullName.Substring(0, 1).ToUpper() : "U")
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label fw-bold">Phone Number</label>
-                                            <input type="text" name="phoneNumber" class="form-control" value="@user.PhoneNumber" placeholder="+880 1711-000000" />
+                                        <div>
+                                            <div class="fw-bold text-dark">@u.FullName</div>
+                                            <div class="text-muted small font-monospace">@@@u.Username</div>
                                         </div>
                                     </div>
-
-                                    @if (account != null)
+                                </td>
+                                <td>
+                                    <div class="small text-dark fw-semibold">@u.Email</div>
+                                    <div class="text-muted small">@(u.PhoneNumber ?? "—")</div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(u.NidNumber))
                                     {
-                                        <hr />
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label class="form-label fw-bold">Account Number</label>
-                                                <input type="text" name="accountNumber" class="form-control" value="@account.AccountNumber" />
-                                            </div>
-                                            <div class="col-md-6 mb-3">
-                                                <label class="form-label fw-bold">Balance (৳)</label>
-                                                <input type="number" step="0.01" name="balance" class="form-control" value="@account.Balance" />
-                                            </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Account Status</label>
-                                            <select name="isActive" class="form-select">
-                                                <option value="true" selected="@(account.IsActive)">Active</option>
-                                                <option value="false" selected="@(!account.IsActive)">Frozen</option>
-                                            </select>
+                                        <span class="badge rounded-pill px-3 py-1 font-monospace fw-bold shadow-sm" style="background: rgba(6, 182, 212, 0.2); border: 1px solid rgba(6, 182, 212, 0.45) !important; color: #38bdf8 !important; font-size: 0.85rem;">
+                                            <i class="bi bi-card-text me-1 text-info"></i>@u.NidNumber
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small font-monospace">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (u.Role == "Admin")
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1 text-white fw-bold shadow-sm" style="background: linear-gradient(135deg, #ef4444, #dc2626); font-size: 0.72rem;">ADMIN</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1 bg-secondary bg-opacity-10 text-secondary border font-semibold small">Customer</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (acc != null)
+                                    {
+                                        <div class="font-monospace fw-bold text-dark d-inline-flex align-items-center gap-1">
+                                            <span>@acc.AccountNumber</span>
+                                            <button type="button" class="btn btn-sm btn-link p-0 text-muted" onclick="copyToClipboard('@acc.AccountNumber', this)" title="Copy Account #">
+                                                <i class="bi bi-copy"></i>
+                                            </button>
                                         </div>
                                     }
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                                </div>
-                            </form>
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-2 rounded-pill small" onclick="openCreateAccountModal(@u.Id, '@u.FullName')">
+                                            <i class="bi bi-plus-circle me-1"></i> Provision Acc
+                                        </button>
+                                    }
+                                </td>
+                                <td class="fw-bold text-success fs-6">
+                                    @(acc != null ? $"৳{acc.Balance:N2}" : "—")
+                                </td>
+                                <td>
+                                    @if (isPending)
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1 text-dark fw-bold border" style="background: #fef3c7; border-color: #fde68a !important;">
+                                            <i class="bi bi-clock-history me-1 text-warning"></i> Pending
+                                        </span>
+                                    }
+                                    else if (isRejected)
+                                    {
+                                        <span class="badge rounded-pill px-3 py-1 bg-danger text-white">
+                                            <i class="bi bi-x-circle me-1"></i> Rejected
+                                        </span>
+                                    }
+                                    else if (isSuspended)
+                                    {
+                                        <span class="badge-suspended">
+                                            <i class="bi bi-exclamation-octagon-fill"></i> Suspended
+                                        </span>
+                                    }
+                                    else if (acc != null && !acc.IsActive)
+                                    {
+                                        <span class="badge-frozen">
+                                            <i class="bi bi-snow2"></i> Frozen
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-active">
+                                            <i class="bi bi-check-circle-fill"></i> Active
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="d-inline-flex gap-1">
+                                        @if (isPending)
+                                        {
+                                            <form asp-controller="Admin" asp-action="ApproveUser" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="userId" value="@u.Id" />
+                                                <button type="submit" class="btn btn-sm text-white rounded-circle p-0 d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: #10b981;" title="Approve Request">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                        }
+
+                                        <!-- Edit User Button -->
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Edit User" 
+                                                onclick="openEditUserModal(@u.Id, '@u.FullName', '@u.Username', '@u.Email', '@(u.PhoneNumber ?? "")', '@(u.NidNumber ?? "")', '@u.Role', '@u.Status', '@(acc?.AccountNumber ?? "")', @(acc?.Balance ?? 0), @(acc?.IsActive == true ? "true" : "false"))">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+
+                                        <!-- Freeze / Unfreeze Toggle Button -->
+                                        @if (acc != null)
+                                        {
+                                            <form asp-controller="Admin" asp-action="ToggleAccountStatus" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="accountId" value="@acc.Id" />
+                                                <button type="submit" class="btn btn-sm @(acc.IsActive ? "btn-outline-info text-dark" : "btn-outline-success") rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="@(acc.IsActive ? "Freeze Account" : "Unfreeze Account")">
+                                                    <i class="bi @(acc.IsActive ? "bi-snow" : "bi-sun-fill")"></i>
+                                                </button>
+                                            </form>
+                                        }
+
+                                        <!-- Suspend / Lockout Button -->
+                                        <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Suspend User" onclick="openSuspendModal(@u.Id, '@u.FullName', @(isSuspended ? "true" : "false"))">
+                                            <i class="bi @(isSuspended ? "bi-unlock-fill" : "bi-lock-fill")"></i>
+                                        </button>
+
+                                        <!-- Delete Trigger Button -->
+                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Delete User" 
+                                                onclick="openDeleteModal(@u.Id, '@u.FullName', '@u.Username', '@u.Role', '@(u.NidNumber ?? "")', '@(acc?.AccountNumber ?? "")', @(acc?.Balance ?? 0))">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">
+                                <i class="bi bi-people fs-1 d-block text-secondary mb-2"></i>
+                                No users found.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: Delete Confirmation Message Box -->
+<!-- ========================================== -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-2xl rounded-4 overflow-hidden">
+            <div class="modal-body p-4 text-center">
+                <div class="d-inline-flex align-items-center justify-content-center bg-danger bg-opacity-10 text-danger rounded-circle p-3 mb-3" style="width: 72px; height: 72px;">
+                    <i class="bi bi-trash3-fill fs-2"></i>
+                </div>
+                
+                <h4 class="fw-extrabold text-dark mb-1">Confirm Deletion</h4>
+                <p class="text-muted small mb-3">Permanently delete this user account from the platform.</p>
+
+                <!-- User Details Card -->
+                <div class="bg-light p-3 rounded-3 text-start mb-3 border">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center fw-bold small" style="width: 32px; height: 32px;" id="delModalAvatar">
+                            U
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark" id="delModalFullName">User Full Name</div>
+                            <div class="text-muted small font-monospace" id="delModalUsername">@@username</div>
+                        </div>
+                        <span class="badge bg-secondary ms-auto small" id="delModalRole">Customer</span>
+                    </div>
+                    <hr class="my-2" />
+                    <div class="row g-2 small">
+                        <div class="col-6">
+                            <span class="text-muted d-block">NID:</span>
+                            <span class="fw-semibold text-dark font-monospace" id="delModalNid">—</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Account:</span>
+                            <span class="fw-semibold text-dark font-monospace" id="delModalAcc">—</span>
                         </div>
                     </div>
                 </div>
-            }
-        </tbody>
-    </table>
+
+                <div class="alert alert-danger d-flex align-items-center gap-2 text-start small mb-0">
+                    <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+                    <div>
+                        <strong>Permanent Action:</strong> This action cannot be undone.
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light px-4 py-3 d-flex justify-content-between border-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <form id="confirmedDeleteForm" asp-controller="Admin" asp-action="DeleteUser" method="post" class="m-0">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="confirmedDeleteUserId" name="userId" />
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm d-inline-flex align-items-center gap-2">
+                        <i class="bi bi-trash3-fill"></i>
+                        <span>Delete Permanently</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Modal 1: Create User -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="CreateUser" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="createUserModalLabel">
+                        <i class="bi bi-person-plus-fill text-primary me-2"></i> Create User
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Full Name *</label>
+                            <input type="text" name="fullName" class="form-control" placeholder="Full name" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Username *</label>
+                            <input type="text" name="username" class="form-control" placeholder="Username" required />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Email Address *</label>
+                            <input type="email" name="email" class="form-control" placeholder="email@domain.com" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Phone Number</label>
+                            <input type="tel" name="phoneNumber" class="form-control" placeholder="+880 1711-000000" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">NID Number</label>
+                            <input type="text" name="nidNumber" class="form-control" placeholder="National ID" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Role *</label>
+                            <select name="role" class="form-select" id="createRoleSelect" onchange="toggleInitialBalance(this.value)">
+                                <option value="Customer">Customer</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Password *</label>
+                            <input type="password" name="password" class="form-control" placeholder="Min 8 chars" required />
+                        </div>
+                        <div class="col-md-6" id="initialBalanceContainer">
+                            <label class="form-label fw-semibold small text-secondary">Opening Balance (৳)</label>
+                            <input type="number" id="initialBalanceInput" name="initialBalance" class="form-control fw-bold text-success" value="1000.00" min="0" step="0.01" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="EditUser" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="editUserId" name="userId" />
+
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="editUserModalLabel">
+                        <i class="bi bi-pencil-square text-primary me-2"></i> Edit User & Account
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Full Name</label>
+                            <input type="text" id="editFullName" name="fullName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Username</label>
+                            <input type="text" id="editUsername" name="username" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Email Address</label>
+                            <input type="email" id="editEmail" name="email" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Phone Number</label>
+                            <input type="tel" id="editPhoneNumber" name="phoneNumber" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">NID Number</label>
+                            <input type="text" id="editNidNumber" name="nidNumber" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small text-secondary">Role</label>
+                            <select id="editRole" name="role" class="form-select">
+                                <option value="Customer">Customer</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small text-secondary">Status</label>
+                            <select id="editStatus" name="status" class="form-select">
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Suspended">Suspended</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+                    <hr />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Account Number</label>
+                            <input type="text" id="editAccountNumber" name="accountNumber" class="form-control font-monospace" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Balance (৳)</label>
+                            <input type="number" id="editBalance" name="balance" class="form-control fw-bold text-success" step="0.01" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-danger rounded-pill px-3 fw-semibold" onclick="triggerDeleteFromEdit()">
+                        <i class="bi bi-trash3-fill me-1"></i> Delete Account
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Save Changes</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Suspension Dialog -->
+<div class="modal fade" id="suspendModal" tabindex="-1" aria-labelledby="suspendModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="SuspendUser" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="suspendUserId" name="userId" />
+
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold" id="suspendModalLabel">
+                        <i class="bi bi-shield-slash-fill me-2"></i> User Suspension
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Action / Duration</label>
+                        <select name="suspensionType" class="form-select" id="selectSuspendType" required>
+                            <option value="1Hour">1 Hour Temporary Suspension</option>
+                            <option value="24Hours">24 Hours Security Hold</option>
+                            <option value="7Days">7 Days Investigation Hold</option>
+                            <option value="Permanent">Indefinite / Permanent Suspension</option>
+                            <option value="Lift">✅ Lift Suspension (Make Active)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Reason / Note</label>
+                        <textarea name="reason" class="form-control" rows="2" placeholder="e.g. KYC review, policy violation"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">Apply Action</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 4: Provision Bank Account -->
+<div class="modal fade" id="createAccountModal" tabindex="-1" aria-labelledby="createAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="CreateAccount" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="accUserId" name="userId" />
+
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="createAccountModalLabel">
+                        <i class="bi bi-bank text-success me-2"></i> Provision Bank Account
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Opening Deposit (৳)</label>
+                        <input type="number" name="initialBalance" class="form-control fw-bold text-success fs-5" value="1000.00" min="0" step="0.01" required />
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-semibold">Provision</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 5: Platform Audit Log -->
+<div class="modal fade" id="auditLogModal" tabindex="-1" aria-labelledby="auditLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="auditLogModalLabel">
+                    <i class="bi bi-journal-text text-primary me-2"></i> Platform Audit Log
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive" style="max-height: 500px;">
+                    <table class="table sb-table mb-0">
+                        <thead class="sticky-top bg-light">
+                            <tr>
+                                <th>Tx Ref</th>
+                                <th>Account #</th>
+                                <th>Type</th>
+                                <th>Amount (৳)</th>
+                                <th>Timestamp</th>
+                                <th>Counterparty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (auditTransactions != null && auditTransactions.Any())
+                            {
+                                @foreach (var tx in auditTransactions)
+                                {
+                                    var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
+                                    <tr>
+                                        <td class="font-monospace fw-bold">#TX-@tx.Id.ToString("D6")</td>
+                                        <td class="font-monospace">@(tx.Account?.AccountNumber ?? $"Acc #{tx.AccountId}")</td>
+                                        <td>
+                                            <span class="badge @(isCredit ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger")">
+                                                @tx.Type.ToString()
+                                            </span>
+                                        </td>
+                                        <td class="fw-bold @(isCredit ? "text-success" : "text-danger")">
+                                            @(isCredit ? "+" : "-")৳@tx.Amount.ToString("N2")
+                                        </td>
+                                        <td class="text-muted small">@tx.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td class="small">@(tx.RelatedAccountId.HasValue ? $"Acc #{tx.RelatedAccountId.Value}" : "—")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">No platform transactions logged yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let editModalInstance = null;
+    let deleteModalInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const editEl = document.getElementById('editUserModal');
+        if (editEl) editModalInstance = new bootstrap.Modal(editEl);
+
+        const delEl = document.getElementById('deleteUserModal');
+        if (delEl) deleteModalInstance = new bootstrap.Modal(delEl);
+    });
+
+    function openEditUserModal(id, fullName, username, email, phone, nid, role, status, accNumber, balance, isActive) {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('editFullName').value = fullName;
+        document.getElementById('editUsername').value = username;
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editPhoneNumber').value = phone;
+        document.getElementById('editNidNumber').value = nid;
+        document.getElementById('editRole').value = role;
+        document.getElementById('editStatus').value = status;
+        document.getElementById('editAccountNumber').value = accNumber;
+        document.getElementById('editBalance').value = balance;
+
+        if (editModalInstance) editModalInstance.show();
+    }
+
+    function openDeleteModal(id, fullName, username, role, nid, accNumber, balance) {
+        document.getElementById('confirmedDeleteUserId').value = id;
+        document.getElementById('delModalFullName').innerText = fullName;
+        document.getElementById('delModalUsername').innerText = '@@' + username;
+        document.getElementById('delModalRole').innerText = role + ' Account';
+        document.getElementById('delModalNid').innerText = nid && nid.trim() !== '' ? nid : 'Not Provided';
+        document.getElementById('delModalAcc').innerText = accNumber && accNumber.trim() !== '' ? accNumber + ' (৳' + Number(balance).toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')' : 'No Active Account';
+        document.getElementById('delModalAvatar').innerText = fullName.length > 0 ? fullName.substring(0, 1).toUpperCase() : 'U';
+
+        if (deleteModalInstance) {
+            deleteModalInstance.show();
+        }
+    }
+
+    function triggerDeleteFromEdit() {
+        const id = document.getElementById('editUserId').value;
+        const fullName = document.getElementById('editFullName').value;
+        const username = document.getElementById('editUsername').value;
+        const role = document.getElementById('editRole').value;
+        const nid = document.getElementById('editNidNumber').value;
+        const accNumber = document.getElementById('editAccountNumber').value;
+        const balance = document.getElementById('editBalance').value;
+
+        if (editModalInstance) editModalInstance.hide();
+        setTimeout(() => {
+            openDeleteModal(id, fullName, username, role, nid, accNumber, balance);
+        }, 300);
+    }
+
+    function openSuspendModal(id, fullName, isCurrentlySuspended) {
+        document.getElementById('suspendUserId').value = id;
+        document.getElementById('suspendUserName').innerText = fullName;
+        if (isCurrentlySuspended) {
+            document.getElementById('selectSuspendType').value = 'Lift';
+        } else {
+            document.getElementById('selectSuspendType').value = '1Hour';
+        }
+        const modal = new bootstrap.Modal(document.getElementById('suspendModal'));
+        modal.show();
+    }
+
+    function openCreateAccountModal(id, fullName) {
+        document.getElementById('accUserId').value = id;
+        document.getElementById('accUserName').innerText = fullName;
+        const modal = new bootstrap.Modal(document.getElementById('createAccountModal'));
+        modal.show();
+    }
+
+    function toggleInitialBalance(role) {
+        const balInput = document.getElementById('initialBalanceInput');
+        if (!balInput) return;
+        if (role === 'Admin') {
+            balInput.value = '0.00';
+            balInput.setAttribute('readonly', 'readonly');
+        } else {
+            balInput.value = '1000.00';
+            balInput.removeAttribute('readonly');
+        }
+    }
+</script>
+}

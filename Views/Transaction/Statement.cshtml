@@ -1,0 +1,171 @@
+@model List<SmartBank.Entities.Transaction>
+@{
+    ViewData["Title"] = "Official Bank Account Statement";
+    var user = ViewBag.User as SmartBank.Entities.User;
+    var account = ViewBag.Account as SmartBank.Entities.Account;
+    DateTime fromDate = ViewBag.FromDate;
+    DateTime toDate = ViewBag.ToDate;
+    decimal totalCredits = ViewBag.TotalCredits ?? 0m;
+    decimal totalDebits = ViewBag.TotalDebits ?? 0m;
+}
+
+<div class="container py-4">
+    <!-- Action controls (hidden when printing) -->
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div class="d-flex align-items-center gap-2">
+            <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Dashboard
+            </a>
+            <h4 class="fw-bold mb-0">Official Account Statement</h4>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary rounded-pill px-4" onclick="window.print()">
+                <i class="bi bi-printer-fill me-1"></i> Print / Save as PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Date Range Filter Card (hidden when printing) -->
+    <div class="sb-card p-3 mb-4 no-print">
+        <form asp-controller="Transaction" asp-action="Statement" method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted fw-semibold">From Date</label>
+                <input type="date" name="fromDate" class="form-control form-control-sm" value="@fromDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted fw-semibold">To Date</label>
+                <input type="date" name="toDate" class="form-control form-control-sm" value="@toDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100 fw-semibold rounded-pill">
+                    <i class="bi bi-funnel me-1"></i> Filter Statement
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Printable Statement Paper -->
+    <div class="sb-card p-4 p-md-5 bg-white shadow-sm border">
+        <!-- Bank Formal Header -->
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-3 p-2" style="font-size: 1.5rem;">
+                        <i class="bi bi-bank"></i>
+                    </span>
+                    <h2 class="fw-bold text-dark mb-0">SmartBank <span class="text-primary fs-5">PLC</span></h2>
+                </div>
+                <div class="small text-muted">
+                    Head Office: 14/A Financial District, Gulshan Avenue, Dhaka-1212<br />
+                    SWIFT: SBNKBDDH | Web: www.smartbank.com | Email: support@smartbank.com
+                </div>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-dark text-white px-3 py-2 fs-6 mb-2">ACCOUNT STATEMENT</span>
+                <div class="small text-muted">Generated: <strong>@DateTime.UtcNow.ToString("MMM dd, yyyy HH:mm") UTC</strong></div>
+            </div>
+        </div>
+
+        <!-- Account Holder & Summary Grid -->
+        <div class="row g-4 mb-4 pb-4 border-bottom">
+            <div class="col-md-6">
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2">Account Holder Details</h6>
+                <div class="fs-5 fw-bold text-dark">@user?.FullName</div>
+                <div class="text-muted small">Username: <span class="text-dark fw-semibold">@@@user?.Username</span></div>
+                <div class="text-muted small">Email: <span class="text-dark fw-semibold">@user?.Email</span></div>
+                <div class="text-muted small">Phone: <span class="text-dark fw-semibold">@(user?.PhoneNumber ?? "Not provided")</span></div>
+            </div>
+            <div class="col-md-6">
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2">Statement Summary</h6>
+                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
+                    <span>Account Number:</span>
+                    <strong class="font-monospace text-dark">@(account?.AccountNumber ?? "N/A")</strong>
+                </div>
+                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
+                    <span>Statement Period:</span>
+                    <strong class="text-dark">@fromDate.ToString("MMM dd, yyyy") — @toDate.ToString("MMM dd, yyyy")</strong>
+                </div>
+                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
+                    <span>Total Inflow (Credits):</span>
+                    <strong class="text-success">+৳@totalCredits.ToString("N2")</strong>
+                </div>
+                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
+                    <span>Total Outflow (Debits):</span>
+                    <strong class="text-danger">-৳@totalDebits.ToString("N2")</strong>
+                </div>
+                <div class="d-flex justify-content-between text-muted small py-1">
+                    <span class="fw-bold text-dark">Current Balance:</span>
+                    <strong class="text-primary fs-6">৳@(account?.Balance.ToString("N2") ?? "0.00")</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statement Transactions Table -->
+        <h6 class="fw-bold text-secondary text-uppercase small mb-3">Itemized Transaction Record</h6>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle small mb-4">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 15%;">Date & Time</th>
+                        <th style="width: 20%;">Ref / Transaction ID</th>
+                        <th style="width: 25%;">Transaction Description</th>
+                        <th class="text-end" style="width: 20%;">Credit (Deposit/In)</th>
+                        <th class="text-end" style="width: 20%;">Debit (Withdraw/Out)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var tx in Model)
+                        {
+                            var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
+                            <tr>
+                                <td>@tx.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="font-monospace">#TX-@tx.Id.ToString("D6")</td>
+                                <td>
+                                    <strong>@tx.Type.ToString()</strong>
+                                    @if (tx.RelatedAccountId.HasValue)
+                                    {
+                                        <span class="text-muted">(Ref Acc: #@tx.RelatedAccountId.Value)</span>
+                                    }
+                                </td>
+                                <td class="text-end text-success fw-bold">
+                                    @(isCredit ? $"৳{tx.Amount:N2}" : "—")
+                                </td>
+                                <td class="text-end text-danger fw-bold">
+                                    @(!isCredit ? $"৳{tx.Amount:N2}" : "—")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No transactions recorded for the selected date range.</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="3" class="text-end">PERIOD TOTALS:</td>
+                        <td class="text-end text-success">+৳@totalCredits.ToString("N2")</td>
+                        <td class="text-end text-danger">-৳@totalDebits.ToString("N2")</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Official Bank Seal & Sign Off -->
+        <div class="d-flex justify-content-between align-items-end pt-4 mt-4 border-top">
+            <div class="small text-muted" style="max-width: 400px;">
+                <em>This statement is an electronically generated legal document from SmartBank Digital Banking Core. It is valid without manual stamp or signature under the Digital Banking Act.</em>
+            </div>
+            <div class="text-center">
+                <div class="border-bottom border-dark pb-1 mb-1" style="width: 180px;">
+                    <span class="font-monospace fw-bold small text-primary">SmartBank Core Ledger</span>
+                </div>
+                <div class="small text-muted">Authorized Bank Officer</div>
+            </div>
+        </div>
+    </div>
+</div>

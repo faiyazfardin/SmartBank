@@ -24,6 +24,9 @@ namespace SmartBank.Entities
         [MaxLength(20)]
         public string? PhoneNumber { get; set; }
 
+        [MaxLength(30)]
+        public string? NidNumber { get; set; }
+
         [Required]
         [MaxLength(50)]
         public string Username { get; set; } = string.Empty;

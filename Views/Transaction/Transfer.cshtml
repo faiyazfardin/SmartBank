@@ -1,36 +1,76 @@
+@model SmartBank.Entities.Account
 @{
-    ViewData["Title"] = "Transfer Funds";
+    ViewData["Title"] = "Fund Transfer";
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0">Transfer Funds</h4>
-            </div>
-            <div class="card-body p-4">
-                @if (!ViewData.ModelState.IsValid)
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="sb-card p-4 p-md-5">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="stat-icon-wrapper stat-icon-warning">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold text-dark mb-0">Account Fund Transfer</h3>
+                        <div class="text-muted small">Send money securely to any SmartBank account</div>
+                    </div>
+                </div>
+
+                @if (ViewBag.ErrorMessage != null)
                 {
-                    <div class="alert alert-danger">
-                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                        {
-                            <p class="mb-0">@error.ErrorMessage</p>
-                        }
+                    <div class="alert alert-danger d-flex align-items-center mb-4">
+                        <i class="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
+                        <div>@ViewBag.ErrorMessage</div>
                     </div>
                 }
 
+                <div class="p-3 bg-light rounded-3 border mb-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="small text-muted">From Account</div>
+                        <div class="fw-bold font-monospace text-dark">@(Model?.AccountNumber ?? "N/A")</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">Available Balance</div>
+                        <div class="fw-bold text-primary fs-5">৳@(Model?.Balance.ToString("N2") ?? "0.00")</div>
+                    </div>
+                </div>
+
                 <form asp-controller="Transaction" asp-action="Transfer" method="post">
-                    <div class="form-floating mb-3">
-                        <input type="text" name="recipientAccountNumber" class="form-control" placeholder="Account number" required />
-                        <label>Recipient Account Number</label>
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Recipient Account Number (12 Digits) *</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-person-badge"></i></span>
+                            <input type="text" name="recipientAccountNumber" class="form-control font-monospace" placeholder="e.g. 100000000001" required />
+                        </div>
+                        <div class="form-text small text-muted">Enter the 12-digit SmartBank account number of the receiver.</div>
                     </div>
-                    <div class="form-floating mb-3">
-                        <input type="number" step="0.01" min="1" name="amount" class="form-control" placeholder="0.00" required />
-                        <label>Amount to Transfer (৳)</label>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-secondary small">Transfer Amount (৳) *</label>
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-light fw-bold text-dark">৳</span>
+                            <input type="number" name="amount" class="form-control fw-bold fs-4" placeholder="0.00" min="1" max="@(Model?.Balance ?? 0)" step="0.01" required />
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between">
-                        <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary">Back to Dashboard</a>
-                        <button type="submit" class="btn btn-warning">Send Transfer</button>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold text-secondary small">Reference / Memo Note (Optional)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-chat-left-text"></i></span>
+                            <input type="text" name="memo" class="form-control" placeholder="e.g. Monthly rent, Project fee, Gift" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary w-50 py-2 fw-semibold rounded-pill">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-warning w-50 py-2 fw-bold text-dark rounded-pill shadow-sm">
+                            <i class="bi bi-send-fill me-1"></i> Send Transfer
+                        </button>
                     </div>
                 </form>
             </div>

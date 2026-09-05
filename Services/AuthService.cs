@@ -63,22 +63,22 @@ namespace SmartBank.Services
             var normalizedUsername = request.Username.Trim().ToLowerInvariant();
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-            // Check duplicate username
+            // Check duplicate username (case-insensitive)
             var usernameExists = await _context.Users.AnyAsync(u => u.Username.ToLower() == normalizedUsername);
             if (usernameExists)
             {
                 return (409, ApiResponse<RegisterResponse>.FailureResponse(
                     "Registration failed",
-                    new List<string> { "Username is already taken" }));
+                    new List<string> { "This username is already taken. Please choose a different username." }));
             }
 
-            // Check duplicate email
+            // Check duplicate email (case-insensitive)
             var emailExists = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail);
             if (emailExists)
             {
                 return (409, ApiResponse<RegisterResponse>.FailureResponse(
                     "Registration failed",
-                    new List<string> { "Email is already registered" }));
+                    new List<string> { "An account with this email address already exists. Please sign in or use another email." }));
             }
 
             var passwordHash = PasswordHasher.HashPassword(request.Password);
@@ -90,10 +90,11 @@ namespace SmartBank.Services
                 FullName = request.FullName.Trim(),
                 Email = normalizedEmail,
                 PhoneNumber = request.PhoneNumber?.Trim(),
+                NidNumber = request.NidNumber?.Trim(),
                 Username = normalizedUsername,
                 PasswordHash = passwordHash,
                 Role = "Customer",
-                Status = "Active",
+                Status = "Pending",
                 FailedLoginCount = 0,
                 LockedUntil = null,
                 CreatedAt = now,
@@ -105,7 +106,7 @@ namespace SmartBank.Services
             {
                 AccountNumber = accountNumber,
                 Balance = initialBalance,
-                IsActive = true,
+                IsActive = false, // Activated upon admin approval
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -152,10 +153,38 @@ namespace SmartBank.Services
 
                 return (201, ApiResponse<RegisterResponse>.SuccessResponse(responseData, "Registration successful"));
             }
+            catch (DbUpdateException dbEx)
+            {
+                await transaction.RollbackAsync();
+                var innerMsg = dbEx.InnerException?.Message ?? dbEx.Message;
+
+                if (innerMsg.Contains("IX_Users_Email", StringComparison.OrdinalIgnoreCase) ||
+                    innerMsg.Contains("email", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (409, ApiResponse<RegisterResponse>.FailureResponse(
+                        "Registration failed",
+                        new List<string> { "An account with this email address already exists. Please sign in or use another email." }));
+                }
+
+                if (innerMsg.Contains("IX_Users_Username", StringComparison.OrdinalIgnoreCase) ||
+                    innerMsg.Contains("username", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (409, ApiResponse<RegisterResponse>.FailureResponse(
+                        "Registration failed",
+                        new List<string> { "This username is already taken. Please choose a different username." }));
+                }
+
+                return (500, ApiResponse<RegisterResponse>.FailureResponse(
+                    "Registration failed",
+                    new List<string> { "Database constraint issue: " + innerMsg }));
+            }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return (500, ApiResponse<RegisterResponse>.FailureResponse("An unexpected error occurred during registration", ex.Message));
+                var message = ex.InnerException?.Message ?? ex.Message;
+                return (500, ApiResponse<RegisterResponse>.FailureResponse(
+                    "An unexpected error occurred during registration",
+                    new List<string> { message }));
             }
         }
 
@@ -184,6 +213,20 @@ namespace SmartBank.Services
                 return (401, ApiResponse<LoginResponse>.FailureResponse(
                     "Invalid username or password",
                     new List<string> { "The username or password is incorrect" }), null);
+            }
+
+            if (user.Status != null && user.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                return (403, ApiResponse<LoginResponse>.FailureResponse(
+                    "Account Pending Verification",
+                    new List<string> { "Your account registration is currently pending administrator verification (NID Review). You will be able to log in once an Admin approves your request." }), null);
+            }
+
+            if (user.Status != null && user.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+            {
+                return (403, ApiResponse<LoginResponse>.FailureResponse(
+                    "Registration Rejected",
+                    new List<string> { "Your account registration request was rejected by Bank Administration. Please contact support." }), null);
             }
 
             if (user.Status != null && user.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))

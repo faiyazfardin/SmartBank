@@ -17,6 +17,10 @@ namespace SmartBank.DTOs.Auth
         [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
         public string? PhoneNumber { get; set; }
 
+        [Required(ErrorMessage = "National ID (NID) Number is required")]
+        [StringLength(30, MinimumLength = 5, ErrorMessage = "NID Number must be between 5 and 30 characters")]
+        public string NidNumber { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "Username is required")]
         [StringLength(50, MinimumLength = 3, ErrorMessage = "Username must be between 3 and 50 characters")]
         [RegularExpression(@"^[a-zA-Z0-9_]+$", ErrorMessage = "Username can only contain letters, numbers, and underscores")]
