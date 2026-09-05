@@ -1,0 +1,191 @@
+@model SmartBank.DTOs.Loans.LoanEligibilityResultDto
+@{
+    ViewData["Title"] = "Smart Loan Eligibility";
+    var user = ViewBag.User as SmartBank.Entities.User;
+    var account = ViewBag.Account as SmartBank.Entities.Account;
+    bool hasPending = ViewBag.HasPendingLoan ?? false;
+}
+
+<div class="container py-4" style="max-width: 950px;">
+    <!-- Top Navigation Breadcrumbs -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a asp-controller="Dashboard" asp-action="Index" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Loan" asp-action="MyApplications" class="btn btn-sm btn-outline-info rounded-pill px-3">
+                <i class="bi bi-clock-history me-1"></i> My Loan Applications
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Eligibility Header Card -->
+    <div class="sb-card p-4 p-md-5 mb-4 position-relative overflow-hidden">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge @(Model.Eligible ? "bg-success-subtle text-success border border-success-subtle" : "bg-warning-subtle text-warning border border-warning-subtle") rounded-pill px-3 py-1 fw-bold">
+                        <i class="bi @(Model.Eligible ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-1"></i>
+                        @(Model.Eligible ? "ELIGIBLE FOR LOAN" : Model.Category.ToUpper())
+                    </span>
+                    <span class="badge bg-dark border text-muted rounded-pill px-3 py-1">Rule-Based Assessment</span>
+                </div>
+
+                <h2 class="fw-extrabold text-white mb-2">Smart Loan Eligibility</h2>
+                <p class="text-secondary mb-3" style="max-width: 580px;">
+                    Our rule-based evaluation analyzes your account maturity, liquidity history, transaction cadence, and stability score to determine instantaneous credit limits.
+                </p>
+
+                <div class="d-flex flex-wrap align-items-center gap-3 pt-2">
+                    @if (Model.Eligible && !hasPending)
+                    {
+                        <a asp-controller="Loan" asp-action="Apply" class="btn-cta-primary px-4 py-2">
+                            <i class="bi bi-cash-coin me-1"></i> Apply for Loan Now
+                        </a>
+                    }
+                    else if (hasPending)
+                    {
+                        <a asp-controller="Loan" asp-action="MyApplications" class="btn btn-warning px-4 py-2 rounded-pill fw-bold">
+                            <i class="bi bi-hourglass-split me-1"></i> View Pending Application
+                        </a>
+                    }
+                    else
+                    {
+                        <button class="btn btn-secondary px-4 py-2 rounded-pill fw-bold" disabled>
+                            <i class="bi bi-lock-fill me-1"></i> Application Locked
+                        </button>
+                    }
+                    <a asp-controller="Transaction" asp-action="Statement" class="btn btn-outline-light rounded-pill px-3 py-2 small">
+                        <i class="bi bi-file-earmark-spreadsheet me-1"></i> View Financial Statement
+                    </a>
+                </div>
+            </div>
+
+            <!-- Score Circular Gauge Widget -->
+            <div class="col-lg-4 text-center">
+                <div class="p-4 rounded-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div class="small text-muted fw-bold text-uppercase tracking-wider mb-2">Eligibility Score</div>
+                    <div class="display-3 fw-extrabold @(Model.Score >= 80 ? "text-success" : Model.Score >= 65 ? "text-info" : Model.Score >= 50 ? "text-warning" : "text-danger") mb-0">
+                        @Model.Score<span class="fs-4 text-muted">/100</span>
+                    </div>
+                    <div class="fw-bold fs-6 mt-1 text-white">
+                        Category: <span class="@(Model.Score >= 65 ? "text-info" : "text-warning")">@Model.Category</span>
+                    </div>
+                    <div class="progress mt-3" style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 6px;">
+                        <div class="progress-bar @(Model.Score >= 80 ? "bg-success" : Model.Score >= 65 ? "bg-info" : Model.Score >= 50 ? "bg-warning" : "bg-danger")"
+                             role="progressbar" style="width: @Model.Score%" aria-valuenow="@Model.Score" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3-Column Metric Highlights -->
+    <div class="row g-3 mb-4">
+        <!-- Maximum Eligible Amount -->
+        <div class="col-md-4">
+            <div class="stat-widget h-100">
+                <div class="stat-icon-wrapper stat-icon-success">
+                    <i class="bi bi-bank"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">MAX ELIGIBLE AMOUNT</div>
+                    <div class="fs-3 fw-bold text-success mt-1">
+                        ৳@Model.MaximumAmount.ToString("N2")
+                    </div>
+                    <div class="small text-muted mt-1">System Limit: ৳500,000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Average Monthly Balance -->
+        <div class="col-md-4">
+            <div class="stat-widget h-100">
+                <div class="stat-icon-wrapper stat-icon-primary">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">AVG MONTHLY BALANCE</div>
+                    <div class="fs-3 fw-bold text-white mt-1">
+                        ৳@Model.AverageMonthlyBalance.ToString("N2")
+                    </div>
+                    <div class="small text-muted mt-1">Current: ৳@(account?.Balance.ToString("N2") ?? "0.00")</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Age & Volume -->
+        <div class="col-md-4">
+            <div class="stat-widget h-100">
+                <div class="stat-icon-wrapper stat-icon-cyan">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div>
+                    <div class="text-muted small fw-semibold">ACCOUNT MATURITY</div>
+                    <div class="fs-3 fw-bold text-info mt-1">
+                        @Model.AccountAgeMonths <span class="fs-6 fw-normal text-muted">Months</span>
+                    </div>
+                    <div class="small text-muted mt-1">Transactions: @Model.TotalTransactions (Min 10)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decision Analysis & Score Breakdown -->
+    <div class="row g-4">
+        <!-- Reasons Checklist -->
+        <div class="col-lg-7">
+            <div class="sb-card p-4 h-100">
+                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-clipboard2-check text-primary"></i> Assessment Decision Factors
+                </h5>
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var reason in Model.Reasons)
+                    {
+                        var isPositive = reason.StartsWith("✓");
+                        <div class="p-3 rounded-3 d-flex align-items-center gap-3" style="background: @(isPositive ? "rgba(16, 185, 129, 0.08)" : "rgba(244, 63, 94, 0.08)"); border: 1px solid @(isPositive ? "rgba(16, 185, 129, 0.2)" : "rgba(244, 63, 94, 0.2)");">
+                            <i class="bi @(isPositive ? "bi-check-circle-fill text-success fs-5" : "bi-x-circle-fill text-danger fs-5")"></i>
+                            <span class="fs-6 @(isPositive ? "text-light" : "text-danger-emphasis")">
+                                @reason.Substring(1).Trim()
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Score Breakdown Details -->
+        <div class="col-lg-5">
+            <div class="sb-card p-4 h-100">
+                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-pie-chart-fill text-info"></i> Score Points Breakdown
+                </h5>
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var item in Model.ScoreBreakdown)
+                    {
+                        <div>
+                            <div class="d-flex justify-content-between text-muted small fw-semibold mb-1">
+                                <span>@item.Key</span>
+                                <span class="text-white fw-bold">@item.Value pts</span>
+                            </div>
+                            <div class="progress" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: @(item.Value * 100 / 30)%" aria-valuenow="@item.Value" aria-valuemin="0" aria-valuemax="30"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-4 p-3 rounded-3 bg-light border border-white-10">
+                    <div class="d-flex align-items-center gap-2 text-warning small fw-bold mb-1">
+                        <i class="bi bi-info-circle"></i> Loan Policy Formula
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Maximum Loan = <code>MIN(Avg Monthly Balance &times; 3, ৳500,000)</code>. Approval requires an active KYC account, minimum 6 months history, and score &ge; 65.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -9,16 +9,21 @@ using SmartBank.Data;
 using SmartBank.Entities;
 using SmartBank.Security;
 
+using SmartBank.DTOs.Loans;
+using SmartBank.Services.Interfaces;
+
 namespace SmartBank.Controllers
 {
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller
     {
         private readonly SmartBankDbContext _context;
+        private readonly ILoanService _loanService;
 
-        public AdminController(SmartBankDbContext context)
+        public AdminController(SmartBankDbContext context, ILoanService loanService)
         {
             _context = context;
+            _loanService = loanService;
         }
 
         // GET: Admin/Users
@@ -464,6 +469,69 @@ namespace SmartBank.Controllers
 
             TempData["SuccessToast"] = $"User details for {user.FullName} (@{user.Username}) updated successfully.";
             return RedirectToAction("Users");
+        }
+
+        // GET: Admin/Loans
+        [HttpGet]
+        public async Task<IActionResult> Loans(string? statusFilter, string? search)
+        {
+            var apps = await _loanService.GetAllApplicationsForAdminAsync(statusFilter);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                apps = apps.Where(a => a.ApplicationNumber.ToLower().Contains(s)
+                                    || a.CustomerName.ToLower().Contains(s)
+                                    || a.CustomerEmail.ToLower().Contains(s)
+                                    || a.AccountNumber.ToLower().Contains(s)).ToList();
+            }
+
+            var stats = await _loanService.GetAdminLoanStatsAsync();
+            ViewBag.Stats = stats;
+            ViewBag.CurrentStatus = statusFilter;
+            ViewBag.CurrentSearch = search;
+
+            return View(apps);
+        }
+
+        // POST: Admin/ApproveLoan
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveLoan(string applicationNumber, string comment)
+        {
+            var adminUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Administrator";
+            var (status, response) = await _loanService.ReviewApplicationAsync(applicationNumber, adminUsername, isApprove: true, comment ?? "Approved after banking criteria review.");
+
+            if (status == 200)
+            {
+                TempData["SuccessToast"] = $"Loan Application {applicationNumber} has been approved successfully.";
+            }
+            else
+            {
+                TempData["ErrorToast"] = response.Message ?? "Failed to approve loan application.";
+            }
+
+            return RedirectToAction("Loans");
+        }
+
+        // POST: Admin/RejectLoan
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectLoan(string applicationNumber, string comment)
+        {
+            var adminUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Administrator";
+            var (status, response) = await _loanService.ReviewApplicationAsync(applicationNumber, adminUsername, isApprove: false, comment ?? "Rejected per loan risk policy.");
+
+            if (status == 200)
+            {
+                TempData["InfoToast"] = $"Loan Application {applicationNumber} has been rejected.";
+            }
+            else
+            {
+                TempData["ErrorToast"] = response.Message ?? "Failed to reject loan application.";
+            }
+
+            return RedirectToAction("Loans");
         }
     }
 }

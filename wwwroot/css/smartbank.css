@@ -549,6 +549,7 @@ main {
 .action-tile.tile-bills i { color: #38bdf8; }
 .action-tile.tile-history i { color: #a5b4fc; }
 .action-tile.tile-statement i { color: #c084fc; }
+.action-tile.tile-loan i { color: #10b981; }
 
 /* Stat Cards */
 .stat-widget {
