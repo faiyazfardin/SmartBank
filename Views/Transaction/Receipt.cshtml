@@ -1,0 +1,104 @@
+@model SmartBank.Entities.Transaction
+@{
+    ViewData["Title"] = "Transaction Receipt";
+    var user = ViewBag.User as SmartBank.Entities.User;
+    var account = ViewBag.Account as SmartBank.Entities.Account;
+    var biller = ViewBag.Biller as string;
+    var billRef = ViewBag.BillRef as string;
+    var category = ViewBag.Category as string;
+    var isCredit = Model.Type == SmartBank.Entities.TransactionType.Deposit || Model.Type == SmartBank.Entities.TransactionType.TransferIn;
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <!-- Receipt Card -->
+            <div class="sb-card p-4 p-md-5 bg-white shadow-md border position-relative">
+                <!-- Top Header -->
+                <div class="text-center mb-4 pb-3 border-bottom">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-sm mb-2" style="width: 56px; height: 56px; font-size: 1.75rem;">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1">Transaction Successful</h4>
+                    <div class="text-muted small">SmartBank Core Banking Network Confirmation</div>
+                </div>
+
+                <!-- Big Amount Banner -->
+                <div class="text-center py-3 bg-light rounded-3 border mb-4">
+                    <div class="small text-muted fw-semibold">TRANSACTION AMOUNT</div>
+                    <div class="display-6 fw-bold @(isCredit ? "text-success" : "text-dark")">
+                        ৳@Model.Amount.ToString("N2")
+                    </div>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 small mt-1">
+                        <i class="bi bi-shield-check me-1"></i> CLEARED & AUDITED
+                    </span>
+                </div>
+
+                <!-- Transaction Details Breakdown -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-secondary text-uppercase small mb-3">Transaction Details</h6>
+                    
+                    <div class="d-flex justify-content-between py-2 border-bottom small">
+                        <span class="text-muted">Transaction Reference:</span>
+                        <strong class="font-monospace text-dark">#TX-@Model.Id.ToString("D6")</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between py-2 border-bottom small">
+                        <span class="text-muted">Transaction Type:</span>
+                        <strong class="text-dark">@Model.Type.ToString()</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between py-2 border-bottom small">
+                        <span class="text-muted">Date & Time:</span>
+                        <strong class="text-dark">@Model.Timestamp.ToString("MMM dd, yyyy HH:mm:ss") UTC</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between py-2 border-bottom small">
+                        <span class="text-muted">Sender / Account:</span>
+                        <strong class="font-monospace text-dark">@(account?.AccountNumber ?? "N/A")</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between py-2 border-bottom small">
+                        <span class="text-muted">Account Holder:</span>
+                        <strong class="text-dark">@user?.FullName</strong>
+                    </div>
+
+                    @if (Model.RelatedAccountId.HasValue)
+                    {
+                        <div class="d-flex justify-content-between py-2 border-bottom small">
+                            <span class="text-muted">Counterparty Account:</span>
+                            <strong class="font-monospace text-primary">Acc #@Model.RelatedAccountId.Value</strong>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(biller))
+                    {
+                        <div class="d-flex justify-content-between py-2 border-bottom small">
+                            <span class="text-muted">Biller / Provider:</span>
+                            <strong class="text-dark">@biller</strong>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom small">
+                            <span class="text-muted">Customer Meter / Ref#:</span>
+                            <strong class="font-monospace text-dark">@billRef</strong>
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between py-2 small">
+                        <span class="text-muted">Updated Available Balance:</span>
+                        <strong class="text-success fs-6">৳@(account?.Balance.ToString("N2") ?? "0.00")</strong>
+                    </div>
+                </div>
+
+                <!-- Action Buttons (hidden in print) -->
+                <div class="d-flex gap-2 no-print pt-2">
+                    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary w-50 py-2 rounded-pill fw-semibold">
+                        <i class="bi bi-arrow-left me-1"></i> Dashboard
+                    </a>
+                    <button type="button" class="btn btn-primary w-50 py-2 rounded-pill fw-bold shadow-sm" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> Print Receipt
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

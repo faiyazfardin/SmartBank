@@ -8,6 +8,14 @@ namespace SmartBank.Controllers
     {
         public IActionResult Index()
         {
+            if (User.Identity != null && User.Identity.IsAuthenticated)
+            {
+                if (User.IsInRole("Admin"))
+                {
+                    return RedirectToAction("Users", "Admin");
+                }
+                return RedirectToAction("Index", "Dashboard");
+            }
             return View();
         }
 

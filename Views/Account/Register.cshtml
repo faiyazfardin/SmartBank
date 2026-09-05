@@ -1,0 +1,205 @@
+@{
+    ViewData["Title"] = "Register — SmartBank";
+}
+
+<div class="auth-wrapper">
+    <div class="auth-card-pro" style="max-width: 560px;">
+        <!-- Brand Header -->
+        <div class="text-center mb-4">
+            <div class="brand-icon-box mx-auto mb-3 shadow-cyan-glow" style="width: 52px; height: 52px; font-size: 1.5rem;">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <h2 class="fw-extrabold text-white mb-1 tracking-tight">Open Your Account</h2>
+            <p class="text-secondary small mb-0">Instant digital onboarding with automatic 12-digit account number</p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                <div class="small fw-semibold">@ViewBag.Error</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form asp-controller="Account" asp-action="Register" method="post" id="registerForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="fullName" id="regFullName" />
+
+            <!-- First Name and Last Name -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">First Name *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-person text-info"></i></span>
+                        <input type="text" id="regFirstName" name="firstName" class="form-control" placeholder="First Name" required />
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Last Name *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-person text-info"></i></span>
+                        <input type="text" id="regLastName" name="lastName" class="form-control" placeholder="Last Name" required />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Username & Email Address -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Username *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-at text-info"></i></span>
+                        <input type="text" name="username" class="form-control" placeholder="Username" required />
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Email Address *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-envelope text-info"></i></span>
+                        <input type="email" name="email" class="form-control" placeholder="Email Address" required />
+                    </div>
+                </div>
+            </div>
+
+            <!-- NID Number & Phone Number -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">NID Number *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-person-vcard text-info"></i></span>
+                        <input type="text" name="nidNumber" class="form-control" placeholder="NID Number" required />
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Phone Number</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-telephone text-info"></i></span>
+                        <input type="tel" name="phoneNumber" class="form-control" placeholder="Phone Number" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Password & Confirm Password -->
+            <div class="row g-3 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Password *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-key text-warning"></i></span>
+                        <input type="password" id="regPassword" name="password" class="form-control" placeholder="Password" required />
+                        <button class="btn btn-outline-secondary toggle-password-btn" type="button" data-target="regPassword">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Confirm Password *</label>
+                    <div class="input-group auth-input-group">
+                        <span class="input-group-text"><i class="bi bi-check2-circle text-warning"></i></span>
+                        <input type="password" id="regConfirmPassword" name="confirmPassword" class="form-control" placeholder="Confirm Password" required />
+                        <button class="btn btn-outline-secondary toggle-password-btn" type="button" data-target="regConfirmPassword">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Password Strength Bar -->
+            <div class="mb-3">
+                <div class="progress rounded-pill" style="height: 6px; background-color: rgba(255, 255, 255, 0.1);">
+                    <div id="strengthBar" class="progress-bar rounded-pill transition-all" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                    <small id="strengthText" class="text-secondary" style="font-size: 0.72rem;">Min 8 chars, 1 number, 1 uppercase</small>
+                    <span class="badge bg-dark text-secondary font-monospace" style="font-size: 0.65rem;">BCrypt Factor 12</span>
+                </div>
+            </div>
+
+            <button type="submit" id="submitRegisterBtn" class="btn-cta-primary w-100 py-2-5 fw-bold shadow-glow mb-3 mt-4">
+                <i class="bi bi-shield-check me-2"></i> Open SmartBank Account
+            </button>
+        </form>
+
+        <div class="text-center pt-3 border-top border-secondary border-opacity-20">
+            <p class="text-secondary small mb-0">
+                Already registered with SmartBank? 
+                <a asp-controller="Account" asp-action="Login" class="fw-bold text-info text-decoration-none ms-1">Sign In to Portal</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let isSubmitting = false;
+    const registerForm = document.getElementById('registerForm');
+    const submitBtn = document.getElementById('submitRegisterBtn');
+
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+
+            // Assemble Full Name
+            const first = document.getElementById('regFirstName')?.value?.trim() || '';
+            const last = document.getElementById('regLastName')?.value?.trim() || '';
+            const fullNameInput = document.getElementById('regFullName');
+            if (fullNameInput) {
+                fullNameInput.value = (first + ' ' + last).trim();
+            }
+
+            // Lock submit button to prevent double-click submissions
+            isSubmitting = true;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.pointerEvents = 'none';
+                submitBtn.style.opacity = '0.85';
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Creating Your Account...';
+            }
+        });
+    }
+
+    const passwordInput = document.getElementById('regPassword');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', () => {
+            const val = passwordInput.value;
+            let score = 0;
+            if (val.length >= 8) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+
+            if (val.length === 0) {
+                strengthBar.style.width = '0%';
+                strengthText.textContent = 'Min 8 chars, 1 number, 1 uppercase';
+                strengthText.className = 'text-secondary';
+            } else if (score <= 1) {
+                strengthBar.style.width = '25%';
+                strengthBar.className = 'progress-bar bg-danger';
+                strengthText.textContent = 'Weak password';
+                strengthText.className = 'text-danger';
+            } else if (score === 2) {
+                strengthBar.style.width = '50%';
+                strengthBar.className = 'progress-bar bg-warning';
+                strengthText.textContent = 'Fair password';
+                strengthText.className = 'text-warning';
+            } else if (score === 3) {
+                strengthBar.style.width = '75%';
+                strengthBar.className = 'progress-bar bg-info';
+                strengthText.textContent = 'Good password';
+                strengthText.className = 'text-info';
+            } else {
+                strengthBar.style.width = '100%';
+                strengthBar.className = 'progress-bar bg-success';
+                strengthText.textContent = 'Strong password!';
+                strengthText.className = 'text-success';
+            }
+        });
+    }
+</script>
+}

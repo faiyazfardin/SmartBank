@@ -4,7 +4,7 @@ namespace SmartBank.Security
 {
     public static class PasswordHasher
     {
-        private const int WorkFactor = 12;
+        private const int WorkFactor = 10;
 
         public static string HashPassword(string password)
         {

@@ -28,35 +28,68 @@ namespace SmartBank.Controllers
             return int.TryParse(claim, out var id) ? id : 0;
         }
 
-        // Deposit
-        [HttpGet]
-        public IActionResult Deposit()
+        private async Task<(Account? Account, string? ErrorMessage)> CheckAccountAndSuspensionAsync(int userId)
         {
-            return View();
-        }
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
 
-        [HttpPost]
-        public async Task<IActionResult> Deposit(decimal amount)
-        {
-            if (amount <= 0)
+            if (user == null)
             {
-                ModelState.AddModelError("", "Deposit amount must be greater than zero.");
-                return View();
+                return (null, "User record not found.");
             }
 
-            var userId = GetCurrentUserId();
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
-
+            var account = user.Accounts.FirstOrDefault();
             if (account == null)
             {
-                ModelState.AddModelError("", "No account found.");
-                return View();
+                return (null, "No active banking account found for this user.");
+            }
+
+            var now = DateTime.UtcNow;
+            if (user.Status != null && user.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+            {
+                if (user.LockedUntil.HasValue && user.LockedUntil.Value > now)
+                {
+                    return (null, $"Your account is temporarily suspended by Bank Administration until {user.LockedUntil.Value:MMM dd, yyyy HH:mm} UTC. Transactions are prohibited.");
+                }
+                return (null, "Your account has been placed under administrative suspension. Transactions are prohibited.");
             }
 
             if (!account.IsActive)
             {
-                ModelState.AddModelError("", "This account is frozen. Contact support.");
-                return View();
+                return (null, "This account is currently frozen. Please contact customer support.");
+            }
+
+            return (account, null);
+        }
+
+        // GET: Transaction/Deposit
+        [HttpGet]
+        public async Task<IActionResult> Deposit()
+        {
+            var userId = GetCurrentUserId();
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            ViewBag.ErrorMessage = error;
+            return View(account);
+        }
+
+        // POST: Transaction/Deposit
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Deposit(decimal amount)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorToast"] = "Deposit amount must be greater than ৳0.";
+                return RedirectToAction("Deposit");
+            }
+
+            var userId = GetCurrentUserId();
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            if (error != null || account == null)
+            {
+                TempData["ErrorToast"] = error ?? "Unable to process deposit.";
+                return RedirectToAction("Deposit");
             }
 
             account.Balance += amount;
@@ -73,45 +106,43 @@ namespace SmartBank.Controllers
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();
 
-            TempData["Message"] = $"Successfully deposited {amount:C}.";
+            TempData["SuccessToast"] = $"Successfully deposited ৳{amount:N2} to your account! New Balance: ৳{account.Balance:N2}";
             return RedirectToAction("Index", "Dashboard");
         }
 
-        // Withdraw
+        // GET: Transaction/Withdraw
         [HttpGet]
-        public IActionResult Withdraw()
+        public async Task<IActionResult> Withdraw()
         {
-            return View();
+            var userId = GetCurrentUserId();
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            ViewBag.ErrorMessage = error;
+            return View(account);
         }
 
+        // POST: Transaction/Withdraw
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Withdraw(decimal amount)
         {
             if (amount <= 0)
             {
-                ModelState.AddModelError("", "Withdrawal amount must be greater than zero.");
-                return View();
+                TempData["ErrorToast"] = "Withdrawal amount must be greater than ৳0.";
+                return RedirectToAction("Withdraw");
             }
 
             var userId = GetCurrentUserId();
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
-
-            if (account == null)
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            if (error != null || account == null)
             {
-                ModelState.AddModelError("", "No account found.");
-                return View();
-            }
-
-            if (!account.IsActive)
-            {
-                ModelState.AddModelError("", "This account is frozen. Contact support.");
-                return View();
+                TempData["ErrorToast"] = error ?? "Unable to process withdrawal.";
+                return RedirectToAction("Withdraw");
             }
 
             if (amount > account.Balance)
             {
-                ModelState.AddModelError("", "Insufficient funds.");
-                return View();
+                TempData["ErrorToast"] = $"Insufficient balance! Available balance is ৳{account.Balance:N2}.";
+                return RedirectToAction("Withdraw");
             }
 
             account.Balance -= amount;
@@ -128,66 +159,85 @@ namespace SmartBank.Controllers
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();
 
-            TempData["Message"] = $"Successfully withdrew {amount:C}.";
+            TempData["SuccessToast"] = $"Successfully withdrew ৳{amount:N2}! Remaining Balance: ৳{account.Balance:N2}";
             return RedirectToAction("Index", "Dashboard");
         }
 
-        // Transfer
+        // GET: Transaction/Transfer
         [HttpGet]
-        public IActionResult Transfer()
+        public async Task<IActionResult> Transfer()
         {
-            return View();
+            var userId = GetCurrentUserId();
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            ViewBag.ErrorMessage = error;
+            return View(account);
         }
 
+        // POST: Transaction/Transfer
         [HttpPost]
-        public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount, string? memo)
         {
+            if (string.IsNullOrWhiteSpace(recipientAccountNumber))
+            {
+                TempData["ErrorToast"] = "Recipient account number is required.";
+                return RedirectToAction("Transfer");
+            }
+
             if (amount <= 0)
             {
-                ModelState.AddModelError("", "Transfer amount must be greater than zero.");
-                return View();
+                TempData["ErrorToast"] = "Transfer amount must be greater than ৳0.";
+                return RedirectToAction("Transfer");
             }
 
             var userId = GetCurrentUserId();
-            var senderAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
-
-            if (senderAccount == null)
+            var (senderAccount, senderError) = await CheckAccountAndSuspensionAsync(userId);
+            if (senderError != null || senderAccount == null)
             {
-                ModelState.AddModelError("", "No account found.");
-                return View();
+                TempData["ErrorToast"] = senderError ?? "Sender account is unavailable.";
+                return RedirectToAction("Transfer");
             }
 
-            if (!senderAccount.IsActive)
+            var recAccClean = recipientAccountNumber.Trim();
+            var recipientUser = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Accounts.Any(a => a.AccountNumber == recAccClean));
+
+            if (recipientUser == null)
             {
-                ModelState.AddModelError("", "Your account is frozen. Contact support.");
-                return View();
+                TempData["ErrorToast"] = $"Recipient account '{recAccClean}' was not found in the SmartBank network.";
+                return RedirectToAction("Transfer");
             }
 
-            var recipientAccount = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.AccountNumber == recipientAccountNumber.Trim());
-
+            var recipientAccount = recipientUser.Accounts.FirstOrDefault(a => a.AccountNumber == recAccClean);
             if (recipientAccount == null)
             {
-                ModelState.AddModelError("", "Recipient account not found.");
-                return View();
-            }
-
-            if (!recipientAccount.IsActive)
-            {
-                ModelState.AddModelError("", "The recipient's account is currently frozen and cannot receive funds.");
-                return View();
+                TempData["ErrorToast"] = "Recipient account record not found.";
+                return RedirectToAction("Transfer");
             }
 
             if (recipientAccount.Id == senderAccount.Id)
             {
-                ModelState.AddModelError("", "You cannot transfer to your own account.");
-                return View();
+                TempData["ErrorToast"] = "Self-transfers are not allowed. Please enter a different recipient account.";
+                return RedirectToAction("Transfer");
+            }
+
+            if (recipientUser.Status != null && recipientUser.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorToast"] = "Transfer failed: The recipient account is under administrative suspension.";
+                return RedirectToAction("Transfer");
+            }
+
+            if (!recipientAccount.IsActive)
+            {
+                TempData["ErrorToast"] = "Transfer failed: The recipient account is frozen and cannot receive incoming funds.";
+                return RedirectToAction("Transfer");
             }
 
             if (amount > senderAccount.Balance)
             {
-                ModelState.AddModelError("", "Insufficient funds.");
-                return View();
+                TempData["ErrorToast"] = $"Insufficient balance! You have ৳{senderAccount.Balance:N2} available.";
+                return RedirectToAction("Transfer");
             }
 
             using var dbTransaction = await _context.Database.BeginTransactionAsync();
@@ -199,7 +249,7 @@ namespace SmartBank.Controllers
                 recipientAccount.Balance += amount;
                 recipientAccount.UpdatedAt = DateTime.UtcNow;
 
-                var outgoing = new Transaction
+                var outTx = new Transaction
                 {
                     AccountId = senderAccount.Id,
                     Type = TransactionType.TransferOut,
@@ -208,7 +258,7 @@ namespace SmartBank.Controllers
                     RelatedAccountId = recipientAccount.Id
                 };
 
-                var incoming = new Transaction
+                var inTx = new Transaction
                 {
                     AccountId = recipientAccount.Id,
                     Type = TransactionType.TransferIn,
@@ -217,40 +267,200 @@ namespace SmartBank.Controllers
                     RelatedAccountId = senderAccount.Id
                 };
 
-                _context.Transactions.Add(outgoing);
-                _context.Transactions.Add(incoming);
+                _context.Transactions.Add(outTx);
+                _context.Transactions.Add(inTx);
+
                 await _context.SaveChangesAsync();
                 await dbTransaction.CommitAsync();
 
-                TempData["Message"] = $"Successfully transferred {amount:C} to account {recipientAccountNumber}.";
-                return RedirectToAction("Index", "Dashboard");
+                TempData["SuccessToast"] = $"Successfully transferred ৳{amount:N2} to {recipientUser.FullName} ({recAccClean})!";
+                return RedirectToAction("Receipt", new { id = outTx.Id });
             }
             catch (Exception ex)
             {
                 await dbTransaction.RollbackAsync();
-                ModelState.AddModelError("", $"Transfer failed: {ex.Message}");
-                return View();
+                TempData["ErrorToast"] = $"Transfer processing error: {ex.Message}";
+                return RedirectToAction("Transfer");
             }
         }
 
-        // History
+        // GET: Transaction/PayBill
         [HttpGet]
-        public async Task<IActionResult> History()
+        public async Task<IActionResult> PayBill()
         {
             var userId = GetCurrentUserId();
-            var account = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == userId);
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            ViewBag.ErrorMessage = error;
+            return View(account);
+        }
 
+        // POST: Transaction/PayBill
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PayBill(string billerCategory, string billerName, string billNumber, decimal amount)
+        {
+            if (string.IsNullOrWhiteSpace(billerName) || string.IsNullOrWhiteSpace(billNumber))
+            {
+                TempData["ErrorToast"] = "Please provide both biller details and account/meter number.";
+                return RedirectToAction("PayBill");
+            }
+
+            if (amount <= 0)
+            {
+                TempData["ErrorToast"] = "Bill payment amount must be greater than ৳0.";
+                return RedirectToAction("PayBill");
+            }
+
+            var userId = GetCurrentUserId();
+            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            if (error != null || account == null)
+            {
+                TempData["ErrorToast"] = error ?? "Unable to process payment.";
+                return RedirectToAction("PayBill");
+            }
+
+            if (amount > account.Balance)
+            {
+                TempData["ErrorToast"] = $"Insufficient balance! Available balance is ৳{account.Balance:N2}.";
+                return RedirectToAction("PayBill");
+            }
+
+            account.Balance -= amount;
+            account.UpdatedAt = DateTime.UtcNow;
+
+            var transaction = new Transaction
+            {
+                AccountId = account.Id,
+                Type = TransactionType.Withdraw, // Utility bill treated as debit
+                Amount = amount,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _context.Transactions.Add(transaction);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessToast"] = $"Successfully paid ৳{amount:N2} to {billerName} (Ref: {billNumber})!";
+            return RedirectToAction("Receipt", new { id = transaction.Id, biller = billerName, billRef = billNumber, category = billerCategory });
+        }
+
+        // GET: Transaction/History
+        [HttpGet]
+        public async Task<IActionResult> History(string? type, string? search)
+        {
+            var userId = GetCurrentUserId();
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            var account = user?.Accounts.FirstOrDefault();
             if (account == null)
             {
                 return View(new List<Transaction>());
             }
 
-            var transactions = await _context.Transactions
-                .Where(t => t.AccountId == account.Id)
+            var query = _context.Transactions
+                .Where(t => t.AccountId == account.Id);
+
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                if (Enum.TryParse<TransactionType>(type, true, out var tType))
+                {
+                    query = query.Where(t => t.Type == tType);
+                }
+            }
+
+            var transactions = await query
                 .OrderByDescending(t => t.Timestamp)
                 .ToListAsync();
 
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                transactions = transactions
+                    .Where(t => t.Id.ToString().Contains(s, StringComparison.OrdinalIgnoreCase)
+                             || t.Amount.ToString().Contains(s, StringComparison.OrdinalIgnoreCase)
+                             || t.Type.ToString().Contains(s, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            ViewBag.SelectedType = type;
+            ViewBag.Search = search;
+            ViewBag.Account = account;
             return View(transactions);
+        }
+
+        // GET: Transaction/Statement
+        [HttpGet]
+        public async Task<IActionResult> Statement(DateTime? fromDate, DateTime? toDate)
+        {
+            var userId = GetCurrentUserId();
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null || !user.Accounts.Any())
+            {
+                return RedirectToAction("Index", "Dashboard");
+            }
+
+            var account = user.Accounts.First();
+            var start = fromDate ?? DateTime.UtcNow.AddMonths(-1);
+            var end = toDate ?? DateTime.UtcNow;
+
+            var transactions = await _context.Transactions
+                .Where(t => t.AccountId == account.Id && t.Timestamp >= start && t.Timestamp <= end.AddDays(1))
+                .OrderByDescending(t => t.Timestamp)
+                .ToListAsync();
+
+            var totalCredits = transactions
+                .Where(t => t.Type == TransactionType.Deposit || t.Type == TransactionType.TransferIn)
+                .Sum(t => t.Amount);
+
+            var totalDebits = transactions
+                .Where(t => t.Type == TransactionType.Withdraw || t.Type == TransactionType.TransferOut)
+                .Sum(t => t.Amount);
+
+            ViewBag.User = user;
+            ViewBag.Account = account;
+            ViewBag.FromDate = start;
+            ViewBag.ToDate = end;
+            ViewBag.TotalCredits = totalCredits;
+            ViewBag.TotalDebits = totalDebits;
+
+            return View(transactions);
+        }
+
+        // GET: Transaction/Receipt
+        [HttpGet]
+        public async Task<IActionResult> Receipt(int id, string? biller = null, string? billRef = null, string? category = null)
+        {
+            var userId = GetCurrentUserId();
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null || !user.Accounts.Any())
+            {
+                return RedirectToAction("Index", "Dashboard");
+            }
+
+            var account = user.Accounts.First();
+            var transaction = await _context.Transactions
+                .FirstOrDefaultAsync(t => t.Id == id && t.AccountId == account.Id);
+
+            if (transaction == null)
+            {
+                TempData["ErrorToast"] = "Transaction record not found.";
+                return RedirectToAction("History");
+            }
+
+            ViewBag.User = user;
+            ViewBag.Account = account;
+            ViewBag.Biller = biller;
+            ViewBag.BillRef = billRef;
+            ViewBag.Category = category;
+
+            return View(transaction);
         }
     }
 }

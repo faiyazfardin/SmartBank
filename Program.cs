@@ -1,5 +1,7 @@
 using System;
+using System.Security.Claims;
 using System.Text;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +18,20 @@ using SmartBank.Security;
 using SmartBank.Services;
 using SmartBank.Services.Interfaces;
 
-var builder = WebApplication.CreateBuilder(args);
+using System.IO;
+
+var contentRoot = Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"))
+    ? Directory.GetCurrentDirectory()
+    : AppContext.BaseDirectory.Contains(Path.Combine("bin", "Debug")) || AppContext.BaseDirectory.Contains(Path.Combine("bin", "Release"))
+        ? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."))
+        : Directory.GetCurrentDirectory();
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRoot,
+    WebRootPath = Path.Combine(contentRoot, "wwwroot")
+});
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -26,7 +41,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<SmartBankDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// In-Memory Caching for Rate Limiting
+// In-Memory Caching for Rate Limiting & Session
 builder.Services.AddMemoryCache();
 
 // Application Services
@@ -35,17 +50,40 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// JWT Authentication Configuration
+// JWT & Cookie Hybrid Authentication Configuration
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "SmartBank_Super_Secret_Key_For_JWT_Authentication_2026_Minimum_32_Chars!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "SmartBankAPI";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "SmartBankClient";
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = "SmartBankAuth";
+    options.DefaultChallengeScheme = "SmartBankAuth";
 })
-.AddJwtBearer(options =>
+.AddPolicyScheme("SmartBankAuth", "SmartBank Hybrid Authentication", options =>
+{
+    options.ForwardDefaultSelector = context =>
+    {
+        string? authHeader = context.Request.Headers["Authorization"];
+        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return JwtBearerDefaults.AuthenticationScheme;
+        }
+        return CookieAuthenticationDefaults.AuthenticationScheme;
+    };
+})
+.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+{
+    options.Cookie.Name = "SmartBank.Session";
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+    options.ExpireTimeSpan = TimeSpan.FromDays(7);
+    options.SlidingExpiration = true;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+})
+.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
@@ -69,7 +107,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("CustomerOnly", policy => policy.RequireRole("Customer"));
 });
 
-builder.Services.AddControllers();
+// Enable MVC Controllers and Views
+builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 
 // Swagger with JWT Bearer configuration
@@ -112,12 +151,12 @@ var app = builder.Build();
 // Global Exception Handling Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Enable Swagger in Development and Production for testing
+// Enable Swagger UI at /swagger
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "SmartBank API v1");
-    c.RoutePrefix = string.Empty; // Serve Swagger at app root URL
+    c.RoutePrefix = "swagger";
 });
 
 // Automatically apply database migrations and seed initial data
@@ -128,6 +167,17 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<SmartBankDbContext>();
         await context.Database.EnsureCreatedAsync();
+
+        // Ensure newly added columns exist in PostgreSQL database
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync("ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"NidNumber\" character varying(30);");
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "Could not apply ALTER TABLE for NidNumber column");
+        }
 
         // Seed or update initial Administrator user
         var adminUser = await context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Username == "admin" || u.Email == "admin@smartbank.com");
@@ -151,7 +201,7 @@ using (var scope = app.Services.CreateScope())
             var adminAccount = new Account
             {
                 AccountNumber = "100000000001",
-                Balance = 50000.00m,
+                Balance = 0.00m,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -159,18 +209,6 @@ using (var scope = app.Services.CreateScope())
 
             adminUser.Accounts.Add(adminAccount);
             context.Users.Add(adminUser);
-            await context.SaveChangesAsync();
-        }
-        else
-        {
-            // Update existing admin credentials to @Dmin12 and ensure active
-            adminUser.FullName = "admin";
-            adminUser.PasswordHash = PasswordHasher.HashPassword("@Dmin12");
-            adminUser.Role = "Admin";
-            adminUser.Status = "Active";
-            adminUser.FailedLoginCount = 0;
-            adminUser.LockedUntil = null;
-            adminUser.UpdatedAt = DateTime.UtcNow;
             await context.SaveChangesAsync();
         }
     }
@@ -182,10 +220,16 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+
 app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapControllers();
 

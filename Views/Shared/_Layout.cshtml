@@ -1,50 +1,167 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - SmartBank</title>
-    <script type="importmap"></script>
+    <title>@ViewData["Title"] - SmartBank Digital</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- SmartBank Theme CSS -->
+    <link rel="stylesheet" href="~/css/smartbank.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/SmartBank.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">SmartBank</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+    <header class="sticky-top">
+        <nav class="navbar navbar-expand-lg navbar-dark glass-nav py-3">
+            <div class="container">
+                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 text-white" href="@(User.IsInRole("Admin") ? Url.Action("Users", "Admin") : Url.Action("Index", "Home"))">
+                    <span class="brand-icon-box">
+                        <i class="bi bi-bank fs-5"></i>
+                    </span>
+                    <span>Smart<span class="text-info">Bank</span></span>
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <span class="badge bg-danger ms-1 text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 0.5px;">Admin Mode</span>
+                    }
+                </a>
+                
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
+
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-warning fw-bold d-flex align-items-center gap-1" asp-controller="Admin" asp-action="Users">
+                                    <i class="bi bi-shield-lock-fill"></i> Admin Command Center
+                                </a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-white-50" asp-controller="Home" asp-action="Index">
+                                    <i class="bi bi-house-door me-1"></i> Home
+                                </a>
+                            </li>
+                            @if (User.Identity != null && User.Identity.IsAuthenticated)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-white" asp-controller="Dashboard" asp-action="Index">
+                                        <i class="bi bi-grid-fill me-1 text-primary"></i> Dashboard
+                                    </a>
+                                </li>
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle text-white-50" href="#" id="txDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-arrow-left-right me-1"></i> Banking Operations
+                                    </a>
+                                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-0" aria-labelledby="txDropdown">
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Deposit">
+                                                <i class="bi bi-arrow-down-circle text-success me-2"></i> Deposit Money
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Withdraw">
+                                                <i class="bi bi-arrow-up-circle text-danger me-2"></i> ATM Cash Withdrawal
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Transfer">
+                                                <i class="bi bi-arrow-repeat text-warning me-2"></i> Fund Transfer
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="PayBill">
+                                                <i class="bi bi-receipt text-info me-2"></i> Pay Utility Bills
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider bg-secondary"></li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="History">
+                                                <i class="bi bi-clock-history text-light me-2"></i> Transaction History
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Statement">
+                                                <i class="bi bi-file-earmark-text text-primary me-2"></i> Account Statement
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </li>
+                            }
+                        }
                     </ul>
+
+                    <!-- Right Authentication partial -->
                     <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - SmartBank - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+    <!-- Global Toast / Alert Banner Container -->
+    @if (ViewContext.RouteData.Values["controller"]?.ToString() != "Account")
+    {
+        <div class="container mt-3 no-print">
+            @if (TempData["SuccessToast"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show shadow-sm d-flex align-items-center alert-auto-dismiss" role="alert">
+                    <i class="bi bi-check-circle-fill fs-5 me-2"></i>
+                    <div class="flex-grow-1">@TempData["SuccessToast"]</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["ErrorToast"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show shadow-sm d-flex align-items-center" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+                    <div class="flex-grow-1">@TempData["ErrorToast"]</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            @if (TempData["InfoToast"] != null)
+            {
+                <div class="alert alert-info alert-dismissible fade show shadow-sm d-flex align-items-center alert-auto-dismiss" role="alert">
+                    <i class="bi bi-info-circle-fill fs-5 me-2"></i>
+                    <div class="flex-grow-1">@TempData["InfoToast"]</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+        </div>
+    }
+
+    <main role="main" class="flex-grow-1 d-flex flex-column">
+        @RenderBody()
+    </main>
+
+    <footer class="border-top footer bg-dark text-white-50 py-4 mt-auto no-print">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-white fw-bold">SmartBank</span> &copy; 2026 — Premier Digital Banking & Wealth Platform
+            </div>
+            <div class="d-flex gap-3 small">
+                <a href="/swagger" class="text-white-50 text-decoration-none hover-white">
+                    <i class="bi bi-code-slash me-1"></i> Swagger API
+                </a>
+                <span class="text-secondary">•</span>
+                <span class="text-success"><i class="bi bi-shield-check me-1"></i> 256-Bit Encrypted</span>
+            </div>
         </div>
     </footer>
+
+    <!-- Scripts -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/smartbank.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

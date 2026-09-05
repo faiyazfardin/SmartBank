@@ -1,50 +1,139 @@
 @model List<SmartBank.Entities.Transaction>
-
 @{
     ViewData["Title"] = "Transaction History";
+    var account = ViewBag.Account as SmartBank.Entities.Account;
+    var selectedType = ViewBag.SelectedType as string;
+    var search = ViewBag.Search as string;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Transaction History</h2>
-    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary">Back to Dashboard</a>
-</div>
-
-@if (!Model.Any())
-{
-    <div class="alert alert-secondary">No transactions recorded yet.</div>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-striped table-hover mt-3 align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Date & Time</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Reference Account</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var t in Model)
-                {
-                    var isPositive = t.Type == SmartBank.Entities.TransactionType.Deposit || t.Type == SmartBank.Entities.TransactionType.TransferIn;
-                    <tr>
-                        <td>@t.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                        <td>
-                            <span class="badge @(isPositive ? "bg-success" : "bg-danger")">
-                                @t.Type
-                            </span>
-                        </td>
-                        <td class="fw-bold @(isPositive ? "text-success" : "text-danger")">
-                            @(isPositive ? "+" : "-")@t.Amount.ToString("C")
-                        </td>
-                        <td>
-                            @(t.RelatedAccountId.HasValue ? $"Account #{t.RelatedAccountId.Value}" : "-")
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<div class="container py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Transaction History & Ledger</h3>
+            <p class="text-muted small mb-0">Complete audit log of all credits, debits, transfers and bill payments</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Transaction" asp-action="Statement" class="btn btn-outline-primary rounded-pill px-3">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Official Statement
+            </a>
+            <a asp-controller="Dashboard" asp-action="Index" class="btn btn-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Dashboard
+            </a>
+        </div>
     </div>
-}
+
+    <!-- Filter & Search Controls -->
+    <div class="sb-card p-3 mb-4">
+        <div class="row g-3 align-items-center">
+            <!-- Filter Tabs -->
+            <div class="col-lg-8">
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Transaction" asp-action="History" class="btn btn-sm rounded-pill @(string.IsNullOrEmpty(selectedType) ? "btn-primary" : "btn-light border")">
+                        All Transactions
+                    </a>
+                    <a asp-controller="Transaction" asp-action="History" asp-route-type="Deposit" class="btn btn-sm rounded-pill @(selectedType == "Deposit" ? "btn-success" : "btn-light border")">
+                        <i class="bi bi-arrow-down-left me-1"></i> Deposits
+                    </a>
+                    <a asp-controller="Transaction" asp-action="History" asp-route-type="Withdraw" class="btn btn-sm rounded-pill @(selectedType == "Withdraw" ? "btn-danger" : "btn-light border")">
+                        <i class="bi bi-arrow-up-right me-1"></i> Withdrawals
+                    </a>
+                    <a asp-controller="Transaction" asp-action="History" asp-route-type="TransferOut" class="btn btn-sm rounded-pill @(selectedType == "TransferOut" ? "btn-warning text-dark" : "btn-light border")">
+                        <i class="bi bi-arrow-up-right me-1"></i> Transfers Out
+                    </a>
+                    <a asp-controller="Transaction" asp-action="History" asp-route-type="TransferIn" class="btn btn-sm rounded-pill @(selectedType == "TransferIn" ? "btn-info text-white" : "btn-light border")">
+                        <i class="bi bi-arrow-down-left me-1"></i> Transfers In
+                    </a>
+                </div>
+            </div>
+
+            <!-- Instant Search Box -->
+            <div class="col-lg-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control border-start-0 client-table-search" data-table="txHistoryTable" placeholder="Filter by amount, ID or type..." value="@search" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Data Table -->
+    <div class="sb-card p-0 overflow-hidden shadow-sm">
+        <div class="table-responsive">
+            <table class="table sb-table" id="txHistoryTable">
+                <thead>
+                    <tr>
+                        <th>Transaction Reference</th>
+                        <th>Type & Nature</th>
+                        <th>Amount (৳)</th>
+                        <th>Timestamp (UTC)</th>
+                        <th>Counterparty / Related</th>
+                        <th class="text-end">Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var tx in Model)
+                        {
+                            var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
+                            <tr>
+                                <td>
+                                    <span class="badge bg-light text-dark border font-monospace py-2 px-2">#TX-@tx.Id.ToString("D6")</span>
+                                </td>
+                                <td>
+                                    @if (tx.Type == SmartBank.Entities.TransactionType.Deposit)
+                                    {
+                                        <span class="badge-active">
+                                            <i class="bi bi-arrow-down-left"></i> Deposit
+                                        </span>
+                                    }
+                                    else if (tx.Type == SmartBank.Entities.TransactionType.Withdraw)
+                                    {
+                                        <span class="badge-frozen">
+                                            <i class="bi bi-arrow-up-right"></i> Withdrawal / Bill
+                                        </span>
+                                    }
+                                    else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
+                                    {
+                                        <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill">
+                                            <i class="bi bi-arrow-down-left"></i> Transfer In
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-suspended">
+                                            <i class="bi bi-arrow-up-right"></i> Transfer Out
+                                        </span>
+                                    }
+                                </td>
+                                <td class="fw-bold @(isCredit ? "text-success" : "text-danger") fs-6">
+                                    @(isCredit ? "+" : "-")৳@tx.Amount.ToString("N2")
+                                </td>
+                                <td class="text-muted small">
+                                    @tx.Timestamp.ToString("MMM dd, yyyy HH:mm:ss")
+                                </td>
+                                <td class="small">
+                                    @(tx.RelatedAccountId.HasValue ? $"Acc #{tx.RelatedAccountId.Value}" : "Self Transaction")
+                                </td>
+                                <td class="text-end">
+                                    <a asp-controller="Transaction" asp-action="Receipt" asp-route-id="@tx.Id" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
+                                        <i class="bi bi-receipt me-1"></i> Receipt
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-1 d-block text-secondary mb-2"></i>
+                                No matching transactions found for this account.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

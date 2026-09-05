@@ -1,45 +1,139 @@
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "SmartBank — Premier Digital Banking";
 }
 
-<div class="p-5 mb-4 bg-light rounded-3 shadow-sm border">
-    <div class="container-fluid py-4">
-        <h1 class="display-5 fw-bold text-primary">Welcome to SmartBank</h1>
-        <p class="col-md-8 fs-5 text-secondary">
-            Your secure, fast, and modern digital banking system. Powered by ASP.NET Core Web API, PostgreSQL/Neon, JWT Bearer authentication, and Windows Forms Desktop Client.
-        </p>
-        <div class="d-flex gap-3 mt-4">
-            <a href="/swagger" class="btn btn-primary btn-lg">🚀 Open Swagger API Docs</a>
-        </div>
-    </div>
-</div>
+<div class="hero-mesh-dark min-vh-100 d-flex flex-column justify-content-center py-3 py-lg-4 position-relative overflow-hidden">
+    <div class="container position-relative my-auto" style="z-index: 2; max-width: 1100px;">
+        
+        <!-- Header: Project Name, Motive & CTAs -->
+        <div class="text-center mb-4">
+            <h1 class="display-4 fw-extrabold text-white tracking-tight mb-2" style="letter-spacing: -1.2px;">
+                Smart<span class="gradient-text-accent">Bank</span>
+            </h1>
 
-<div class="row align-items-md-stretch g-4">
-    <div class="col-md-4">
-        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
-            <h4>⚡ Instant Deposits & Withdrawals</h4>
-            <p class="text-muted">Deposit funds and withdraw money securely in real-time with automatic balance calculation and full audit trail.</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
-            <h4>🔄 Account-to-Account Transfers</h4>
-            <p class="text-muted">Easily transfer funds to any other account number within SmartBank with validation against insufficient funds and frozen status.</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="h-100 p-4 bg-white border rounded-3 shadow-sm">
-            <h4>🛡️ Admin Control & Security</h4>
-            <p class="text-muted">BCrypt password hashing (factor 12), IP rate limiting, account lockout after 5 failed attempts, and JWT authorization.</p>
-        </div>
-    </div>
-</div>
+            <p class="text-light opacity-90 mx-auto mb-3 lead fs-6" style="max-width: 720px; line-height: 1.6;">
+                A next-generation digital banking platform engineered for instant, secure financial transactions.<br class="d-none d-md-inline" />
+                Empowering individuals and businesses with real-time liquidity and institutional-grade security.
+            </p>
 
-<div class="alert alert-secondary mt-4">
-    <h6 class="fw-bold mb-1">🔑 Demo / Default Admin Credentials</h6>
-    <div class="small">
-        <span>Username: <code>admin</code></span> | 
-        <span>Email: <code>admin@smartbank.com</code></span> | 
-        <span>Password: <code>@@Dmin12</code></span>
+            <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 mb-3">
+                <a asp-controller="Account" asp-action="Register" class="btn-cta-primary px-4 py-2 fs-6">
+                    <i class="bi bi-person-plus-fill me-1"></i> Open Account Free
+                </a>
+                <a asp-controller="Account" asp-action="Login" class="btn-cta-glass px-4 py-2 fs-6">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Sign In to Portal
+                </a>
+            </div>
+        </div>
+
+        <!-- Compact 6-Feature Grid (Fits in One Screen) -->
+        <div class="row g-2 g-md-3 mb-3">
+            <!-- Feature 1: Deposits -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-emerald mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">Instant Deposits</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Instant funding with presets or custom sums and live ledger synchronization.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 2: ATM Withdraw -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-rose mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-cash-stack"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">ATM Cash Access</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Cash dispenser simulation with live balance validation and overdraft protection.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 3: P2P Transfers -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-amber mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">P2P Transfers</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Atomic ACID transfers between accounts with live recipient lookup.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 4: Utility Bills -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-cyan mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-receipt"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">Utility Bill Pay</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        DESCO, WASA, Titas Gas, Internet Broadband & Telecom top-up with receipts.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 5: Statements -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-violet mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-file-earmark-spreadsheet"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">Official Statements</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Custom date filters, credit/debit breakdowns & printable bank letterheads.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 6: Admin Governance -->
+            <div class="col-6 col-md-4">
+                <div class="feature-card-pro p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="feature-icon-box icon-box-indigo mb-0" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 10px;">
+                            <i class="bi bi-shield-lock"></i>
+                        </div>
+                        <h6 class="fw-bold text-white mb-0 small">Admin Command</h6>
+                    </div>
+                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
+                        Real-time customer status control, freezing, suspensions & security audits.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trust Badges Bar -->
+        <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 pt-1">
+            <span class="stat-pill" style="font-size: 0.75rem; padding: 4px 12px;">
+                <i class="bi bi-shield-lock-fill text-success"></i> BCrypt 256-Bit
+            </span>
+            <span class="stat-pill" style="font-size: 0.75rem; padding: 4px 12px;">
+                <i class="bi bi-lightning-charge-fill text-warning"></i> Sub-Second Processing
+            </span>
+            <span class="stat-pill" style="font-size: 0.75rem; padding: 4px 12px;">
+                <i class="bi bi-cpu-fill text-info"></i> 100% ACID Integrity
+            </span>
+            <span class="stat-pill" style="font-size: 0.75rem; padding: 4px 12px;">
+                <i class="bi bi-clock-history text-light opacity-75"></i> 24/7 Availability
+            </span>
+        </div>
+
     </div>
 </div>
