@@ -41,7 +41,12 @@
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-warning fw-bold d-flex align-items-center gap-1" asp-controller="Admin" asp-action="Users">
-                                    <i class="bi bi-shield-lock-fill"></i> Admin Command Center
+                                    <i class="bi bi-shield-lock-fill"></i> User Directory
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-info fw-bold d-flex align-items-center gap-1" asp-controller="Admin" asp-action="Loans">
+                                    <i class="bi bi-cash-coin"></i> Loan Governance
                                 </a>
                             </li>
                         }
@@ -82,6 +87,22 @@
                                         <li>
                                             <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="PayBill">
                                                 <i class="bi bi-receipt text-info me-2"></i> Pay Utility Bills
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider bg-secondary"></li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="Eligibility">
+                                                <i class="bi bi-speedometer2 text-warning me-2"></i> Loan Eligibility
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="Apply">
+                                                <i class="bi bi-cash-coin text-success me-2"></i> Apply for Loan
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="MyApplications">
+                                                <i class="bi bi-folder-check text-info me-2"></i> My Loan Applications
                                             </a>
                                         </li>
                                         <li><hr class="dropdown-divider bg-secondary"></li>

@@ -13,6 +13,7 @@ namespace SmartBank.Data
         public DbSet<Account> Accounts { get; set; } = null!;
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
+        public DbSet<LoanApplication> LoanApplications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -74,6 +75,39 @@ namespace SmartBank.Data
                 entity.HasOne(t => t.Account)
                     .WithMany(a => a.Transactions)
                     .HasForeignKey(t => t.AccountId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // LoanApplication configuration
+            modelBuilder.Entity<LoanApplication>(entity =>
+            {
+                entity.HasKey(l => l.Id);
+                entity.Property(l => l.ApplicationNumber).IsRequired().HasMaxLength(30);
+                entity.Property(l => l.LoanType).IsRequired().HasMaxLength(50).HasDefaultValue("Personal");
+                entity.Property(l => l.RequestedAmount).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.EligibleAmount).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.EligibilityCategory).IsRequired().HasMaxLength(50).HasDefaultValue("Not Eligible");
+                entity.Property(l => l.Purpose).IsRequired().HasMaxLength(500);
+                entity.Property(l => l.MonthlyIncome).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Pending");
+                entity.Property(l => l.AdminNote).HasMaxLength(1000);
+                entity.Property(l => l.ReviewedBy).HasMaxLength(100);
+
+                // Indexes
+                entity.HasIndex(l => l.ApplicationNumber).IsUnique();
+                entity.HasIndex(l => l.UserId);
+                entity.HasIndex(l => l.AccountId);
+                entity.HasIndex(l => l.Status);
+
+                // Relationships
+                entity.HasOne(l => l.User)
+                    .WithMany(u => u.LoanApplications)
+                    .HasForeignKey(l => l.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(l => l.Account)
+                    .WithMany(a => a.LoanApplications)
+                    .HasForeignKey(l => l.AccountId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
         }

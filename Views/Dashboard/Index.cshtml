@@ -223,40 +223,46 @@
     <div class="mb-4">
         <h5 class="fw-bold text-dark mb-3">Quick Banking Operations</h5>
         <div class="row g-3">
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="Deposit" class="action-tile tile-deposit">
                     <i class="bi bi-arrow-down-circle-fill"></i>
                     <span>Deposit Money</span>
                 </a>
             </div>
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="Withdraw" class="action-tile tile-withdraw">
                     <i class="bi bi-arrow-up-circle-fill"></i>
                     <span>ATM Withdraw</span>
                 </a>
             </div>
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="Transfer" class="action-tile tile-transfer">
                     <i class="bi bi-arrow-repeat"></i>
                     <span>Fund Transfer</span>
                 </a>
             </div>
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="PayBill" class="action-tile tile-bills">
                     <i class="bi bi-receipt-cutoff"></i>
-                    <span>Pay Utility Bills</span>
+                    <span>Pay Bills</span>
                 </a>
             </div>
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
+                <a asp-controller="Loan" asp-action="Eligibility" class="action-tile tile-loan">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Loan Service</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="History" class="action-tile tile-history">
                     <i class="bi bi-clock-history"></i>
                     <span>History Log</span>
                 </a>
             </div>
-            <div class="col-6 col-md-4 col-lg-2">
+            <div class="col-6 col-md-4 col-lg-3 col-xl">
                 <a asp-controller="Transaction" asp-action="Statement" class="action-tile tile-statement">
                     <i class="bi bi-file-earmark-pdf-fill"></i>
-                    <span>Bank Statement</span>
+                    <span>Statement</span>
                 </a>
             </div>
         </div>
