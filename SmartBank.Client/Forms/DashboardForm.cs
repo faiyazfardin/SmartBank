@@ -528,6 +528,10 @@ namespace SmartBank.Client.Forms
             {
                 BtnChangePassword_Click(this, EventArgs.Empty);
             }
+            else if (dlg.HasChangesSaved)
+            {
+                LoadUserData();
+            }
         }
 
         private async Task RefreshBalanceAndHistoryAsync(bool isBackgroundPoll = false)

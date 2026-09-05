@@ -11,6 +11,7 @@ namespace SmartBank.Services.Interfaces
         Task<(int StatusCode, ApiResponse<RefreshTokenResponse> Response)> RefreshTokenAsync(RefreshTokenRequest request, string? ipAddress);
         Task<(int StatusCode, ApiResponse<bool> Response)> LogoutAsync(string? refreshToken, int userId);
         Task<(int StatusCode, ApiResponse<LoginResponse> Response)> GetCurrentUserProfileAsync(int userId);
+        Task<(int StatusCode, ApiResponse<LoginResponse> Response)> UpdateProfileAsync(int userId, UpdateProfileRequest request);
         Task<(int StatusCode, ApiResponse<bool> Response)> ChangePasswordAsync(int userId, ChangePasswordRequest request);
     }
 }

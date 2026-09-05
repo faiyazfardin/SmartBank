@@ -72,5 +72,90 @@ namespace SmartBank.Controllers
             TempData["Message"] = $"Account {newAccount.AccountNumber} created successfully.";
             return RedirectToAction("Users");
         }
+
+        // POST: Admin/EditUser
+        [HttpPost]
+        public async Task<IActionResult> EditUser(int userId, string fullName, string username, string email, string? phoneNumber, string role, string? accountNumber, decimal? balance, bool? isActive)
+        {
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Users");
+            }
+
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                var normUser = username.Trim().ToLowerInvariant();
+                var exists = await _context.Users.AnyAsync(u => u.Username.ToLower() == normUser && u.Id != userId);
+                if (exists)
+                {
+                    TempData["Error"] = "Username is already taken by another account.";
+                    return RedirectToAction("Users");
+                }
+                user.Username = normUser;
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var normEmail = email.Trim().ToLowerInvariant();
+                var exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == normEmail && u.Id != userId);
+                if (exists)
+                {
+                    TempData["Error"] = "Email is already registered by another account.";
+                    return RedirectToAction("Users");
+                }
+                user.Email = normEmail;
+            }
+
+            if (!string.IsNullOrWhiteSpace(fullName))
+            {
+                user.FullName = fullName.Trim();
+            }
+
+            user.PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                user.Role = role.Trim();
+            }
+
+            var account = user.Accounts.FirstOrDefault();
+            if (account != null)
+            {
+                if (!string.IsNullOrWhiteSpace(accountNumber) && accountNumber.Trim() != account.AccountNumber)
+                {
+                    var newAcc = accountNumber.Trim();
+                    var exists = await _context.Accounts.AnyAsync(a => a.AccountNumber == newAcc && a.Id != account.Id);
+                    if (exists)
+                    {
+                        TempData["Error"] = "Account number already exists.";
+                        return RedirectToAction("Users");
+                    }
+                    account.AccountNumber = newAcc;
+                }
+
+                if (balance.HasValue && balance.Value >= 0)
+                {
+                    account.Balance = balance.Value;
+                }
+
+                if (isActive.HasValue)
+                {
+                    account.IsActive = isActive.Value;
+                }
+
+                account.UpdatedAt = DateTime.UtcNow;
+            }
+
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            TempData["Message"] = $"User details for {user.FullName} (@{user.Username}) updated successfully.";
+            return RedirectToAction("Users");
+        }
     }
 }

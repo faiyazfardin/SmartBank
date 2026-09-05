@@ -182,6 +182,17 @@ namespace SmartBank.Client.Security
             }
         }
 
+        public void UpdateProfile(string fullName, string email, string? phoneNumber)
+        {
+            lock (_lock)
+            {
+                FullName = fullName;
+                Email = email;
+                PhoneNumber = phoneNumber;
+                SaveSession();
+            }
+        }
+
         public void ClearSession()
         {
             lock (_lock)
