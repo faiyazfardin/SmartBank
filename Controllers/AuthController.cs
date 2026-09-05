@@ -116,6 +116,33 @@ namespace SmartBank.Controllers
         }
 
         [Authorize]
+        [HttpPut("profile")]
+        [HttpPost("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+
+                return BadRequest(ApiResponse<LoginResponse>.FailureResponse("Validation error", errors));
+            }
+
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(ApiResponse<LoginResponse>.FailureResponse("Unauthorized", "Invalid token subject"));
+            }
+
+            var (statusCode, response) = await _authService.UpdateProfileAsync(userId, request);
+            return StatusCode(statusCode, response);
+        }
+
+        [Authorize]
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {

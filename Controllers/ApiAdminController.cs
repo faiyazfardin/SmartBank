@@ -37,6 +37,20 @@ namespace SmartBank.Controllers
             public bool AccountActive { get; set; }
         }
 
+        public class AdminUpdateUserRequest
+        {
+            public int UserId { get; set; }
+            public string FullName { get; set; } = string.Empty;
+            public string Username { get; set; } = string.Empty;
+            public string Email { get; set; } = string.Empty;
+            public string? PhoneNumber { get; set; }
+            public string? Role { get; set; }
+            public string? Status { get; set; }
+            public string? AccountNumber { get; set; }
+            public decimal? Balance { get; set; }
+            public bool? AccountActive { get; set; }
+        }
+
         [HttpGet("users")]
         public async Task<IActionResult> GetAllUsers()
         {
@@ -62,6 +76,110 @@ namespace SmartBank.Controllers
                 .ToListAsync();
 
             return Ok(ApiResponse<List<AdminUserDto>>.SuccessResponse(users));
+        }
+
+        [HttpPost("update-user")]
+        [HttpPut("users/{userId}")]
+        public async Task<IActionResult> UpdateUser([FromRoute] int? userId, [FromBody] AdminUpdateUserRequest request)
+        {
+            var targetUserId = userId ?? request.UserId;
+            if (targetUserId <= 0)
+            {
+                return BadRequest(ApiResponse<bool>.FailureResponse("Invalid user ID specified"));
+            }
+
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == targetUserId);
+
+            if (user == null)
+            {
+                return NotFound(ApiResponse<bool>.FailureResponse("User not found"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Username))
+            {
+                var normalizedUsername = request.Username.Trim().ToLowerInvariant();
+                var usernameTaken = await _context.Users.AnyAsync(u => u.Username.ToLower() == normalizedUsername && u.Id != targetUserId);
+                if (usernameTaken)
+                {
+                    return BadRequest(ApiResponse<bool>.FailureResponse("Username is already taken by another account"));
+                }
+                user.Username = normalizedUsername;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Email))
+            {
+                var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+                var emailTaken = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail && u.Id != targetUserId);
+                if (emailTaken)
+                {
+                    return BadRequest(ApiResponse<bool>.FailureResponse("Email is already registered by another account"));
+                }
+                user.Email = normalizedEmail;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.FullName))
+            {
+                user.FullName = request.FullName.Trim();
+            }
+
+            user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+
+            if (!string.IsNullOrWhiteSpace(request.Role))
+            {
+                var role = request.Role.Trim();
+                if (role.Equals("Admin", System.StringComparison.OrdinalIgnoreCase) || role.Equals("Customer", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    user.Role = char.ToUpper(role[0]) + role.Substring(1).ToLower();
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Status))
+            {
+                user.Status = request.Status.Trim();
+                if (user.Status.Equals("Active", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    user.LockedUntil = null;
+                    user.FailedLoginCount = 0;
+                }
+            }
+
+            // Update associated account if present
+            var account = user.Accounts.FirstOrDefault();
+            if (account != null)
+            {
+                if (!string.IsNullOrWhiteSpace(request.AccountNumber) && request.AccountNumber.Trim() != account.AccountNumber)
+                {
+                    var newAccNum = request.AccountNumber.Trim();
+                    var accExists = await _context.Accounts.AnyAsync(a => a.AccountNumber == newAccNum && a.Id != account.Id);
+                    if (accExists)
+                    {
+                        return BadRequest(ApiResponse<bool>.FailureResponse("Account number is already assigned to another account"));
+                    }
+                    account.AccountNumber = newAccNum;
+                }
+
+                if (request.Balance.HasValue)
+                {
+                    if (request.Balance.Value < 0)
+                    {
+                        return BadRequest(ApiResponse<bool>.FailureResponse("Account balance cannot be negative"));
+                    }
+                    account.Balance = request.Balance.Value;
+                }
+
+                if (request.AccountActive.HasValue)
+                {
+                    account.IsActive = request.AccountActive.Value;
+                }
+                account.UpdatedAt = System.DateTime.UtcNow;
+            }
+
+            user.UpdatedAt = System.DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResponse<bool>.SuccessResponse(true, $"User @{user.Username} details updated successfully"));
         }
 
         [HttpPost("toggle-account")]

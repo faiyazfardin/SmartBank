@@ -345,6 +345,51 @@ namespace SmartBank.Services
             return (200, ApiResponse<LoginResponse>.SuccessResponse(responseData));
         }
 
+        public async Task<(int StatusCode, ApiResponse<LoginResponse> Response)> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+        {
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return (404, ApiResponse<LoginResponse>.FailureResponse("User not found"));
+            }
+
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var emailExists = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail && u.Id != userId);
+            if (emailExists)
+            {
+                return (409, ApiResponse<LoginResponse>.FailureResponse("Email is already in use by another account"));
+            }
+
+            user.FullName = request.FullName.Trim();
+            user.Email = normalizedEmail;
+            user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var primaryAccount = await _context.Accounts.FirstOrDefaultAsync(a => a.UserId == user.Id);
+            var responseData = new LoginResponse
+            {
+                Token = string.Empty,
+                RefreshToken = null,
+                UserId = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Role = user.Role,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
+                AccountNumber = primaryAccount?.AccountNumber ?? string.Empty,
+                Balance = primaryAccount?.Balance ?? 0.00m,
+                ExpiresIn = _jwtService.GetExpiryMinutes() * 60
+            };
+
+            return (200, ApiResponse<LoginResponse>.SuccessResponse(responseData, "Profile updated successfully"));
+        }
+
         public async Task<(int StatusCode, ApiResponse<bool> Response)> ChangePasswordAsync(int userId, ChangePasswordRequest request)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);

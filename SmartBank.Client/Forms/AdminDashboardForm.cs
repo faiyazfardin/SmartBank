@@ -17,6 +17,7 @@ namespace SmartBank.Client.Forms
         private DataGridView dgvUsers = null!;
         private TextBox txtSearch = null!;
         private Button btnClearSearch = null!;
+        private Button btnEditUser = null!;
         private Button btnToggleStatus = null!;
         private Button btnSuspendUser = null!;
         private Button btnUnlockUser = null!;
@@ -27,6 +28,9 @@ namespace SmartBank.Client.Forms
         private Label lblActiveAccounts = null!;
         private Label lblLockedUsers = null!;
         private Panel pnlUserBadge = null!;
+        private Label lblUserAvatar = null!;
+        private Label lblUserName = null!;
+        private Label lblUserTier = null!;
         private Label lblNoData = null!;
 
         private List<AdminUserItem> _allUsers = new();
@@ -116,7 +120,7 @@ namespace SmartBank.Client.Forms
                 initials = parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : sess.FullName.Substring(0, Math.Min(2, sess.FullName.Length)).ToUpper();
             }
 
-            var lblUserAvatar = new Label
+            lblUserAvatar = new Label
             {
                 Text = initials,
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
@@ -129,7 +133,7 @@ namespace SmartBank.Client.Forms
             };
             lblUserAvatar.Click += (s, e) => OpenAdminProfileDialog();
 
-            var lblUserName = new Label
+            lblUserName = new Label
             {
                 Text = string.IsNullOrEmpty(sess.FullName) ? sess.Username : sess.FullName,
                 ForeColor = Color.White,
@@ -140,7 +144,7 @@ namespace SmartBank.Client.Forms
             };
             lblUserName.Click += (s, e) => OpenAdminProfileDialog();
 
-            var lblUserTier = new Label
+            lblUserTier = new Label
             {
                 Text = "🛡️ System Administrator • Details ➔",
                 ForeColor = Color.FromArgb(248, 113, 113),
@@ -217,7 +221,7 @@ namespace SmartBank.Client.Forms
             txtSearch = new TextBox
             {
                 Location = new Point(96, 6),
-                Size = new Size(180, 28),
+                Size = new Size(130, 28),
                 Font = new Font("Segoe UI", 10.5F),
                 PlaceholderText = "Enter digits..."
             };
@@ -231,7 +235,7 @@ namespace SmartBank.Client.Forms
                 BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(28, 28),
-                Location = new Point(282, 6),
+                Location = new Point(232, 6),
                 Cursor = Cursors.Hand
             };
             btnClearSearch.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
@@ -243,6 +247,21 @@ namespace SmartBank.Client.Forms
                 txtSearch.Focus();
             };
 
+            btnEditUser = new Button
+            {
+                Text = "✏️ Edit User",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(203, 213, 225),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(130, 34),
+                Location = new Point(270, 5),
+                Enabled = false,
+                Cursor = Cursors.Default
+            };
+            btnEditUser.FlatAppearance.BorderSize = 0;
+            btnEditUser.Click += BtnEditUser_Click;
+
             btnToggleStatus = new Button
             {
                 Text = "❄️ Freeze Account",
@@ -250,8 +269,8 @@ namespace SmartBank.Client.Forms
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(203, 213, 225),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(170, 34),
-                Location = new Point(340, 5),
+                Size = new Size(155, 34),
+                Location = new Point(410, 5),
                 Enabled = false,
                 Cursor = Cursors.Default
             };
@@ -265,8 +284,8 @@ namespace SmartBank.Client.Forms
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(203, 213, 225),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(170, 34),
-                Location = new Point(520, 5),
+                Size = new Size(155, 34),
+                Location = new Point(575, 5),
                 Enabled = false,
                 Cursor = Cursors.Default
             };
@@ -280,8 +299,8 @@ namespace SmartBank.Client.Forms
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(203, 213, 225),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(160, 34),
-                Location = new Point(700, 5),
+                Size = new Size(150, 34),
+                Location = new Point(740, 5),
                 Enabled = false,
                 Cursor = Cursors.Default
             };
@@ -296,7 +315,7 @@ namespace SmartBank.Client.Forms
                 BackColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(95, 34),
-                Location = new Point(915, 5),
+                Location = new Point(900, 5),
                 Cursor = Cursors.Hand
             };
             btnRefresh.FlatAppearance.BorderColor = Color.FromArgb(203, 213, 225);
@@ -306,7 +325,7 @@ namespace SmartBank.Client.Forms
                 await LoadUsersAsync();
             };
 
-            pnlToolbar.Controls.AddRange(new Control[] { lblSearch, txtSearch, btnClearSearch, btnToggleStatus, btnSuspendUser, btnUnlockUser, btnRefresh });
+            pnlToolbar.Controls.AddRange(new Control[] { lblSearch, txtSearch, btnClearSearch, btnEditUser, btnToggleStatus, btnSuspendUser, btnUnlockUser, btnRefresh });
 
             // 4. USERS DATAGRIDVIEW
             dgvUsers = new DataGridView
@@ -345,6 +364,7 @@ namespace SmartBank.Client.Forms
 
             dgvUsers.SelectionChanged += (s, e) => UpdateActionButtonsState();
             dgvUsers.CellClick += DgvUsers_CellClick;
+            dgvUsers.CellDoubleClick += DgvUsers_CellDoubleClick;
 
             // Placeholder for empty results / validation notices
             lblNoData = new Label
@@ -376,6 +396,23 @@ namespace SmartBank.Client.Forms
             {
                 BtnLogout_Click(this, EventArgs.Empty);
             }
+            else if (dlg.HasChangesSaved)
+            {
+                UpdateAdminBadge();
+            }
+        }
+
+        private void UpdateAdminBadge()
+        {
+            var sess = SessionManager.Instance;
+            lblUserName.Text = string.IsNullOrEmpty(sess.FullName) ? sess.Username : sess.FullName;
+            var initials = "AD";
+            if (!string.IsNullOrEmpty(sess.FullName))
+            {
+                var parts = sess.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                initials = parts.Length >= 2 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : sess.FullName.Substring(0, Math.Min(2, sess.FullName.Length)).ToUpper();
+            }
+            lblUserAvatar.Text = initials;
         }
 
         private static Panel CreateMetricCard(string title, string initialValue, Color accentColor, Point location, out Label valueLabel, Action? onClick = null)
@@ -528,6 +565,11 @@ namespace SmartBank.Client.Forms
                 var selected = (AdminUserItem)dgvUsers.SelectedRows[0].Tag!;
                 bool isTargetAdmin = selected.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
 
+                // Edit User Button
+                btnEditUser.Enabled = true;
+                btnEditUser.BackColor = Color.FromArgb(37, 99, 235);
+                btnEditUser.Cursor = Cursors.Hand;
+
                 // 1. Freeze / Unfreeze Account Button
                 btnToggleStatus.Enabled = !isTargetAdmin;
                 btnToggleStatus.BackColor = selected.AccountActive ? Color.FromArgb(217, 119, 6) : Color.FromArgb(16, 185, 129);
@@ -549,6 +591,10 @@ namespace SmartBank.Client.Forms
             else
             {
                 // No rows selected or empty search result
+                btnEditUser.Enabled = false;
+                btnEditUser.BackColor = Color.FromArgb(203, 213, 225);
+                btnEditUser.Cursor = Cursors.Default;
+
                 btnToggleStatus.Enabled = false;
                 btnToggleStatus.BackColor = Color.FromArgb(203, 213, 225);
                 btnToggleStatus.Text = "❄️ Freeze Account";
@@ -563,6 +609,29 @@ namespace SmartBank.Client.Forms
                 btnUnlockUser.BackColor = Color.FromArgb(203, 213, 225);
                 btnUnlockUser.Text = "🔓 Unlock Logins";
                 btnUnlockUser.Cursor = Cursors.Default;
+            }
+        }
+
+        private async void BtnEditUser_Click(object? sender, EventArgs e)
+        {
+            if (dgvUsers.SelectedRows.Count == 0 || dgvUsers.SelectedRows[0].Tag is not AdminUserItem selected)
+            {
+                MessageBox.Show("Please select a user from the table to edit.", "Selection Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var dlg = new AdminEditUserDialog(selected);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                await LoadUsersAsync();
+            }
+        }
+
+        private void DgvUsers_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && dgvUsers.Rows[e.RowIndex].Tag is AdminUserItem)
+            {
+                BtnEditUser_Click(sender, EventArgs.Empty);
             }
         }
 
