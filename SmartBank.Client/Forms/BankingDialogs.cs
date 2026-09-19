@@ -294,6 +294,13 @@ namespace SmartBank.Client.Forms
                     this.DialogResult = DialogResult.None;
                     return;
                 }
+                var (isValid, errorMsg) = SmartBank.Client.Security.PasswordValidator.Validate(txtNew.Text);
+                if (!isValid)
+                {
+                    MessageBox.Show(errorMsg, "Password Requirements Not Met", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    this.DialogResult = DialogResult.None;
+                    return;
+                }
             };
 
             var btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(210, 250), Size = new Size(169, 42), BackColor = Color.FromArgb(241, 245, 249), ForeColor = Color.FromArgb(71, 85, 105), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };

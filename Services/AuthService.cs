@@ -87,6 +87,11 @@ namespace SmartBank.Services
                     new List<string> { "An account with this email address already exists. Please sign in or use another email." }));
             }
 
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                request.Password = SmartBank.Helpers.PasswordGeneratorHelper.GenerateSecurePassword(10);
+            }
+
             var passwordHash = PasswordHasher.HashPassword(request.Password);
             var accountNumber = await GenerateUnique12DigitAccountNumberAsync();
 
@@ -99,6 +104,8 @@ namespace SmartBank.Services
                 NidNumber = request.NidNumber?.Trim(),
                 Username = normalizedUsername,
                 PasswordHash = passwordHash,
+                MustChangePasswordOnNextLogin = true,
+                TemporaryPasswordIssuedAtUtc = now,
                 Role = "Customer",
                 Status = "Pending",
                 FailedLoginCount = 0,
@@ -457,7 +464,15 @@ namespace SmartBank.Services
                 return (400, ApiResponse<bool>.FailureResponse("New password must be different from current password"));
             }
 
+            var (isValid, errorMessage) = SmartBank.Security.PasswordValidator.Validate(request.NewPassword);
+            if (!isValid)
+            {
+                return (400, ApiResponse<bool>.FailureResponse("Validation error", errorMessage));
+            }
+
             user.PasswordHash = PasswordHasher.HashPassword(request.NewPassword);
+            user.MustChangePasswordOnNextLogin = false;
+            user.TemporaryPasswordIssuedAtUtc = null;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

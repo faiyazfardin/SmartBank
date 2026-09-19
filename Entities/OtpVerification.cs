@@ -9,7 +9,8 @@ namespace SmartBank.Entities
         GoogleLogin = 1,
         Registration = 2,
         PasswordReset = 3,
-        TransactionApproval = 4
+        TransactionApproval = 4,
+        Login = 5
     }
 
     [Table("OtpVerifications")]

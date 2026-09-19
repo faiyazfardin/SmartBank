@@ -645,26 +645,53 @@ namespace SmartBank.Client.Forms
             }
         }
 
+        private async Task ExecuteOtpTransactionFlowAsync(string apiEndpoint, object initiatePayload)
+        {
+            try
+            {
+                var initRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientOtpChallengeResult>>(apiEndpoint, initiatePayload);
+
+                if (initRes == null || !initRes.Success || initRes.Data == null)
+                {
+                    MessageBox.Show(initRes?.Message ?? "Unable to initiate transaction.", "Transaction Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                using var otpDlg = new OtpVerificationDialog(
+                    initRes.Data.ChallengeId,
+                    initRes.Data.TransactionType,
+                    initRes.Data.Amount,
+                    initRes.Data.TargetInfo ?? "",
+                    initRes.Data.MaskedEmail);
+
+                if (otpDlg.ShowDialog(this) == DialogResult.OK && otpDlg.IsVerifiedSuccessfully)
+                {
+                    SessionManager.Instance.Balance = otpDlg.NewBalance;
+                    UpdateBalanceDisplay();
+
+                    using var successForm = new TransactionSuccessForm(
+                        initRes.Data.TransactionType,
+                        initRes.Data.Amount,
+                        otpDlg.TrackingId,
+                        otpDlg.NewBalance);
+
+                    successForm.ShowDialog(this);
+
+                    await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
+                }
+            }
+            catch (ApiException ex)
+            {
+                MessageBox.Show(ex.Message, "Transaction Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
         private async void BtnDeposit_Click(object? sender, EventArgs e)
         {
             using var dlg = new DepositDialog();
             if (dlg.ShowDialog(this) == DialogResult.OK && dlg.DepositAmount > 0)
             {
-                try
-                {
-                    var res = await ApiClient.PostAsync<ApiResponse<decimal>>("transactions/deposit", new { amount = dlg.DepositAmount });
-                    if (res != null && res.Success)
-                    {
-                        SessionManager.Instance.Balance = res.Data;
-                        UpdateBalanceDisplay();
-                        MessageBox.Show($"Deposit of ৳{dlg.DepositAmount:N2} successfully credited to your checking account.", "Deposit Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
-                    }
-                }
-                catch (ApiException ex)
-                {
-                    MessageBox.Show(ex.Message, "Deposit Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                await ExecuteOtpTransactionFlowAsync("transactions/deposit/initiate", new { amount = dlg.DepositAmount });
             }
         }
 
@@ -673,53 +700,12 @@ namespace SmartBank.Client.Forms
             using var dlg = new TransferDialog();
             if (dlg.ShowDialog(this) == DialogResult.OK && dlg.TransferAmount > 0 && !string.IsNullOrWhiteSpace(dlg.RecipientAccount))
             {
-                try
+                await ExecuteOtpTransactionFlowAsync("transactions/transfer/initiate", new
                 {
-                    // Step 1: Initiate Transfer & Request Email OTP
-                    var initRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientInitiateTransferResult>>("transactions/transfer", new
-                    {
-                        recipientAccountNumber = dlg.RecipientAccount.Trim(),
-                        amount = dlg.TransferAmount,
-                        memo = dlg.Note
-                    });
-
-                    if (initRes == null || !initRes.Success || initRes.Data == null)
-                    {
-                        MessageBox.Show(initRes?.Message ?? "Unable to initiate transfer.", "Transfer Initialization Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    // Step 2: Prompt Customer for Email OTP
-                    using var otpDlg = new TransferOtpDialog(
-                        initRes.Data.TransferRequestId,
-                        initRes.Data.Amount,
-                        initRes.Data.MaskedRecipient,
-                        initRes.Data.MaskedEmail);
-
-                    if (otpDlg.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(otpDlg.OtpCode))
-                    {
-                        // Step 3: Verify OTP & Atomically Execute Transfer
-                        var verifyRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientCompleteTransferResult>>(
-                            $"transfers/{initRes.Data.TransferRequestId}/verify-otp",
-                            new { otp = otpDlg.OtpCode.Trim() });
-
-                        if (verifyRes != null && verifyRes.Success && verifyRes.Data != null)
-                        {
-                            SessionManager.Instance.Balance = verifyRes.Data.SenderNewBalance;
-                            UpdateBalanceDisplay();
-                            MessageBox.Show(verifyRes.Message, "Transfer Completed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
-                        }
-                        else
-                        {
-                            MessageBox.Show(verifyRes?.Message ?? "Verification failed.", "Transfer Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
-                    }
-                }
-                catch (ApiException ex)
-                {
-                    MessageBox.Show(ex.Message, "Transfer Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                    recipientAccountNumber = dlg.RecipientAccount.Trim(),
+                    amount = dlg.TransferAmount,
+                    memo = dlg.Note
+                });
             }
         }
 
@@ -728,21 +714,7 @@ namespace SmartBank.Client.Forms
             using var dlg = new WithdrawDialog();
             if (dlg.ShowDialog(this) == DialogResult.OK && dlg.WithdrawAmount > 0)
             {
-                try
-                {
-                    var res = await ApiClient.PostAsync<ApiResponse<decimal>>("transactions/withdraw", new { amount = dlg.WithdrawAmount });
-                    if (res != null && res.Success)
-                    {
-                        SessionManager.Instance.Balance = res.Data;
-                        UpdateBalanceDisplay();
-                        MessageBox.Show($"ATM Withdrawal of ৳{dlg.WithdrawAmount:N2} successfully processed.", "Withdrawal Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
-                    }
-                }
-                catch (ApiException ex)
-                {
-                    MessageBox.Show(ex.Message, "Withdrawal Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                await ExecuteOtpTransactionFlowAsync("transactions/withdraw/initiate", new { amount = dlg.WithdrawAmount });
             }
         }
 
@@ -751,28 +723,13 @@ namespace SmartBank.Client.Forms
             using var dlg = new BillPayDialog();
             if (dlg.ShowDialog(this) == DialogResult.OK && dlg.BillAmount > 0)
             {
-                try
+                await ExecuteOtpTransactionFlowAsync("transactions/bills/initiate", new
                 {
-                    var res = await ApiClient.PostAsync<ApiResponse<decimal>>("transactions/pay-bill", new
-                    {
-                        billerName = dlg.BillerName,
-                        billType = dlg.BillType,
-                        referenceNumber = dlg.ReferenceNumber,
-                        amount = dlg.BillAmount
-                    });
-
-                    if (res != null && res.Success)
-                    {
-                        SessionManager.Instance.Balance = res.Data;
-                        UpdateBalanceDisplay();
-                        MessageBox.Show(res.Message, "Bill Paid Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
-                    }
-                }
-                catch (ApiException ex)
-                {
-                    MessageBox.Show(ex.Message, "Bill Payment Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                    billerName = dlg.BillerName,
+                    billType = dlg.BillType,
+                    referenceNumber = dlg.ReferenceNumber,
+                    amount = dlg.BillAmount
+                });
             }
         }
 

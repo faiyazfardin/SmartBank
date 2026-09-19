@@ -52,17 +52,13 @@ namespace SmartBank.Services
 
         public string Generate6DigitOtp()
         {
-            // Cryptographically secure 6-digit number between 100000 and 999999
             int code = RandomNumberGenerator.GetInt32(100000, 1000000);
             return code.ToString("D6");
         }
 
         public string HashOtp(string otp)
         {
-            using var sha256 = SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes("SmartBank_OTP_Salt_" + otp.Trim());
-            var hashBytes = sha256.ComputeHash(bytes);
-            return Convert.ToHexString(hashBytes);
+            return BCrypt.Net.BCrypt.HashPassword(otp.Trim());
         }
 
         public bool VerifyOtpHash(string plainOtp, string hashedOtp)
@@ -70,11 +66,14 @@ namespace SmartBank.Services
             if (string.IsNullOrWhiteSpace(plainOtp) || string.IsNullOrWhiteSpace(hashedOtp))
                 return false;
 
-            var computedHash = HashOtp(plainOtp);
-            return CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(computedHash),
-                Encoding.UTF8.GetBytes(hashedOtp)
-            );
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(plainOtp.Trim(), hashedOtp);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public async Task<(OtpChallenge Challenge, string PlainOtp)> CreateChallengeAsync(int userId, string purpose, string? referenceId, int expiryMinutes = 5)
@@ -82,41 +81,36 @@ namespace SmartBank.Services
             var plainOtp = Generate6DigitOtp();
             var hash = HashOtp(plainOtp);
 
-            // Invalidate any existing active challenges for this user/purpose/reference
-            var existingChallenges = await _context.OtpChallenges
-                .Where(o => o.UserId == userId && o.Purpose == purpose && o.ReferenceId == referenceId && o.UsedAt == null && o.ExpiresAt > DateTime.UtcNow)
-                .ToListAsync();
-
-            foreach (var old in existingChallenges)
-            {
-                old.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
-            }
+            var now = DateTime.UtcNow;
 
             var challenge = new OtpChallenge
             {
+                Id = Guid.NewGuid(),
                 UserId = userId,
-                Purpose = purpose,
-                ReferenceId = referenceId,
-                CodeHash = hash,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes),
-                UsedAt = null,
+                HashedOtp = hash,
+                TransactionType = purpose ?? "Transfer",
+                TransactionId = Guid.TryParse(referenceId, out var g) ? g : Guid.NewGuid(),
+                IssuedAt = now,
+                ExpiresAt = now.AddSeconds(120),
+                LastSentAt = now,
+                IsUsed = false,
                 AttemptCount = 0,
-                LastResentAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
+                MaxAttempts = 5,
+                Status = "Pending"
             };
 
             _context.OtpChallenges.Add(challenge);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Generated OTP challenge for User ID {UserId}, Purpose: {Purpose}, Reference: {ReferenceId}", userId, purpose, referenceId);
+            _logger.LogInformation("Generated OTP challenge for User ID {UserId}, Purpose: {Purpose}", userId, purpose);
             return (challenge, plainOtp);
         }
 
         public async Task<(bool IsValid, string? ErrorMessage)> ValidateChallengeAsync(int userId, string purpose, string? referenceId, string plainOtp)
         {
             var challenge = await _context.OtpChallenges
-                .Where(o => o.UserId == userId && o.Purpose == purpose && o.ReferenceId == referenceId)
-                .OrderByDescending(o => o.CreatedAt)
+                .Where(o => o.UserId == userId && o.TransactionType == purpose)
+                .OrderByDescending(o => o.IssuedAt)
                 .FirstOrDefaultAsync();
 
             if (challenge == null)
@@ -124,55 +118,58 @@ namespace SmartBank.Services
                 return (false, "No active verification challenge found. Please request a new code.");
             }
 
-            if (challenge.IsUsed)
+            if (challenge.IsUsed || challenge.Status == "Used")
             {
                 return (false, "This verification code has already been used.");
             }
 
-            if (challenge.IsExpired)
+            if (challenge.IsExpired || challenge.Status == "Expired")
             {
-                return (false, "This verification code has expired (valid for 5 minutes). Please request a new code.");
+                return (false, "This verification code has expired. Please request a new code.");
             }
 
-            if (challenge.IsLockedOut)
+            if (challenge.AttemptCount >= MaxAttempts || challenge.Status == "Locked")
             {
-                return (false, "Too many incorrect attempts (maximum 5). This code has been invalidated for security. Please request a new code.");
+                return (false, "Too many incorrect attempts (maximum 5). This code has been locked.");
             }
 
-            if (!VerifyOtpHash(plainOtp, challenge.CodeHash))
+            if (!VerifyOtpHash(plainOtp, challenge.HashedOtp))
             {
                 challenge.AttemptCount++;
+                if (challenge.AttemptCount >= MaxAttempts)
+                {
+                    challenge.Status = "Locked";
+                }
                 await _context.SaveChangesAsync();
 
                 var remainingAttempts = MaxAttempts - challenge.AttemptCount;
                 if (remainingAttempts <= 0)
                 {
-                    challenge.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
-                    await _context.SaveChangesAsync();
-                    return (false, "Invalid verification code. Maximum attempts exceeded. Code has been invalidated.");
+                    return (false, "Invalid verification code. Maximum attempts exceeded. Code has been locked.");
                 }
 
                 return (false, $"Invalid verification code. {remainingAttempts} attempt(s) remaining.");
             }
 
-            // Valid! Mark used
+            challenge.IsUsed = true;
             challenge.UsedAt = DateTime.UtcNow;
+            challenge.Status = "Used";
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("OTP successfully validated for User ID {UserId}, Purpose: {Purpose}, Reference: {ReferenceId}", userId, purpose, referenceId);
+            _logger.LogInformation("OTP successfully validated for User ID {UserId}, Purpose: {Purpose}", userId, purpose);
             return (true, null);
         }
 
         public async Task<(bool Success, string? ErrorMessage, string? NewPlainOtp)> ResendChallengeAsync(int userId, string purpose, string? referenceId, int cooldownSeconds = 60)
         {
             var challenge = await _context.OtpChallenges
-                .Where(o => o.UserId == userId && o.Purpose == purpose && o.ReferenceId == referenceId)
-                .OrderByDescending(o => o.CreatedAt)
+                .Where(o => o.UserId == userId && o.TransactionType == purpose)
+                .OrderByDescending(o => o.IssuedAt)
                 .FirstOrDefaultAsync();
 
-            if (challenge != null && challenge.LastResentAt.HasValue)
+            if (challenge != null && challenge.LastSentAt.HasValue)
             {
-                var elapsed = (DateTime.UtcNow - challenge.LastResentAt.Value).TotalSeconds;
+                var elapsed = (DateTime.UtcNow - challenge.LastSentAt.Value).TotalSeconds;
                 if (elapsed < cooldownSeconds)
                 {
                     var waitSec = (int)Math.Ceiling(cooldownSeconds - elapsed);
@@ -187,11 +184,12 @@ namespace SmartBank.Services
         public async Task InvalidateChallengeAsync(int userId, string purpose, string? referenceId)
         {
             var activeChallenges = await _context.OtpChallenges
-                .Where(o => o.UserId == userId && o.Purpose == purpose && o.ReferenceId == referenceId && o.UsedAt == null)
+                .Where(o => o.UserId == userId && o.TransactionType == purpose && !o.IsUsed)
                 .ToListAsync();
 
             foreach (var ch in activeChallenges)
             {
+                ch.Status = "Expired";
                 ch.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
             }
             await _context.SaveChangesAsync();

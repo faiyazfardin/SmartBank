@@ -40,7 +40,7 @@ namespace SmartBank.Entities
         [MaxLength(50)]
         public string Status { get; set; } = TransferRequestStatus.PendingOtp;
 
-        public int? OtpChallengeId { get; set; }
+        public Guid? OtpChallengeId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

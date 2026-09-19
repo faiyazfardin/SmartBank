@@ -1,0 +1,8 @@
+@model SmartBank.Entities.OtpChallenge
+@{
+    ViewData["Title"] = "Security OTP Verification — SmartBank";
+}
+
+<div class="container py-5">
+    @await Html.PartialAsync("_OtpModal", Model)
+</div>

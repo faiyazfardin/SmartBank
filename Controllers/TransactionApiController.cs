@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
 using SmartBank.DTOs.Common;
+using SmartBank.DTOs.Transactions;
 using SmartBank.Entities;
 using SmartBank.Services.Interfaces;
 
@@ -20,12 +21,14 @@ namespace SmartBank.Controllers
     public class TransactionApiController : ControllerBase
     {
         private readonly SmartBankDbContext _context;
-        private readonly ITransferService _transferService;
+        private readonly IOtpTransactionService _otpTransactionService;
 
-        public TransactionApiController(SmartBankDbContext context, ITransferService transferService)
+        public TransactionApiController(
+            SmartBankDbContext context,
+            IOtpTransactionService otpTransactionService)
         {
             _context = context;
-            _transferService = transferService;
+            _otpTransactionService = otpTransactionService;
         }
 
         private int GetCurrentUserId()
@@ -46,193 +49,105 @@ namespace SmartBank.Controllers
             public string? Memo { get; set; }
         }
 
-        public class VerifyTransferOtpApiRequest
-        {
-            public string Otp { get; set; } = string.Empty;
-        }
-
-        private async Task<(Account? Account, string? ErrorMessage)> CheckSuspensionAndAccountAsync(int userId)
-        {
-            var user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null)
-            {
-                return (null, "User record not found");
-            }
-
-            var account = user.Accounts.FirstOrDefault();
-            if (account == null)
-            {
-                return (null, "Account record not found");
-            }
-
-            var now = DateTime.UtcNow;
-            if (user.Status != null && user.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
-            {
-                if (user.LockedUntil.HasValue && user.LockedUntil.Value > now && user.LockedUntil.Value < now.AddYears(10))
-                {
-                    var timeRemaining = user.LockedUntil.Value - now;
-                    var timeStr = timeRemaining.TotalDays >= 1 
-                        ? $"{(int)timeRemaining.TotalDays} day(s) and {timeRemaining.Hours} hour(s)" 
-                        : $"{(int)timeRemaining.TotalHours} hour(s) and {timeRemaining.Minutes} minute(s)";
-                    return (null, $"Transaction declined: This account is suspended by Bank Administration until {user.LockedUntil.Value:MMM dd, yyyy HH:mm} UTC (approx. {timeStr} remaining). No transactions are granted.");
-                }
-                return (null, "Transaction declined: This account has been placed under indefinite administrative suspension. All debit and credit transactions are prohibited.");
-            }
-
-            if (!account.IsActive)
-            {
-                return (null, "Transaction declined: This account is currently frozen. Please contact customer support.");
-            }
-
-            return (account, null);
-        }
-
-        [HttpPost("deposit")]
-        public async Task<IActionResult> Deposit([FromBody] AmountRequest request)
-        {
-            if (request.Amount <= 0)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Deposit amount must be greater than zero"));
-            }
-
-            var userId = GetCurrentUserId();
-            var (account, errorMsg) = await CheckSuspensionAndAccountAsync(userId);
-            if (errorMsg != null || account == null)
-            {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse(errorMsg ?? "Account unavailable"));
-            }
-
-            account.Balance += request.Amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Deposit,
-                Amount = request.Amount,
-                Timestamp = DateTime.UtcNow
-            };
-
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            return Ok(ApiResponse<decimal>.SuccessResponse(account.Balance, $"Successfully deposited {request.Amount:C}"));
-        }
-
-        [HttpPost("withdraw")]
-        public async Task<IActionResult> Withdraw([FromBody] AmountRequest request)
-        {
-            if (request.Amount <= 0)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Withdrawal amount must be greater than zero"));
-            }
-
-            var userId = GetCurrentUserId();
-            var (account, errorMsg) = await CheckSuspensionAndAccountAsync(userId);
-            if (errorMsg != null || account == null)
-            {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse(errorMsg ?? "Account unavailable"));
-            }
-
-            if (request.Amount > account.Balance)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Insufficient funds"));
-            }
-
-            account.Balance -= request.Amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Withdraw,
-                Amount = request.Amount,
-                Timestamp = DateTime.UtcNow
-            };
-
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            return Ok(ApiResponse<decimal>.SuccessResponse(account.Balance, $"Successfully withdrew {request.Amount:C}"));
-        }
-
-        // POST: api/transactions/transfer or api/transfers -> Initiates pending transfer & dispatches email OTP
-        [HttpPost]
-        [HttpPost("transfer")]
-        public async Task<IActionResult> Transfer([FromBody] TransferApiRequest request)
-        {
-            var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.InitiateTransferAsync(
-                userId, request.RecipientAccountNumber, request.Amount, request.Memo);
-
-            return StatusCode(statusCode, response);
-        }
-
-        // POST: api/transfers/{id}/verify-otp or api/transactions/transfer/{id}/verify-otp
-        [HttpPost("{id}/verify-otp")]
-        [HttpPost("transfer/{id}/verify-otp")]
-        public async Task<IActionResult> VerifyTransferOtp(int id, [FromBody] VerifyTransferOtpApiRequest request)
-        {
-            var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.VerifyAndCompleteTransferAsync(userId, id, request.Otp);
-
-            return StatusCode(statusCode, response);
-        }
-
-        // POST: api/transfers/{id}/resend-otp or api/transactions/transfer/{id}/resend-otp
-        [HttpPost("{id}/resend-otp")]
-        [HttpPost("transfer/{id}/resend-otp")]
-        public async Task<IActionResult> ResendTransferOtp(int id)
-        {
-            var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.ResendTransferOtpAsync(userId, id);
-
-            return StatusCode(statusCode, response);
-        }
-
-        public class PayBillRequest
+        public class PayBillApiRequest
         {
             public string BillerName { get; set; } = string.Empty;
-            public string BillType { get; set; } = string.Empty;
-            public string ReferenceNumber { get; set; } = string.Empty;
+            public string? BillType { get; set; }
+            public string? ReferenceNumber { get; set; }
             public decimal Amount { get; set; }
         }
 
-        [HttpPost("pay-bill")]
-        public async Task<IActionResult> PayBill([FromBody] PayBillRequest request)
+        // POST: api/transactions/deposit/initiate (and legacy POST api/transactions/deposit)
+        [HttpPost("deposit/initiate")]
+        [HttpPost("deposit")]
+        public async Task<IActionResult> InitiateDeposit([FromBody] AmountRequest request)
         {
-            if (request.Amount <= 0)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Bill payment amount must be greater than zero"));
-            }
-
             var userId = GetCurrentUserId();
-            var (account, errorMsg) = await CheckSuspensionAndAccountAsync(userId);
-            if (errorMsg != null || account == null)
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse(errorMsg ?? "Account unavailable"));
-            }
-
-            if (request.Amount > account.Balance)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Insufficient funds to pay this bill"));
-            }
-
-            account.Balance -= request.Amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Withdraw,
+                TransactionType = "Deposit",
                 Amount = request.Amount,
-                Timestamp = DateTime.UtcNow
-            };
+                Reference = "Account Deposit Credit"
+            });
 
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
+            return StatusCode(statusCode, response);
+        }
 
-            return Ok(ApiResponse<decimal>.SuccessResponse(account.Balance, $"Successfully paid {request.Amount:C} for {request.BillerName} ({request.BillType}) - Ref: {request.ReferenceNumber}"));
+        // POST: api/transactions/withdraw/initiate (and legacy POST api/transactions/withdraw)
+        [HttpPost("withdraw/initiate")]
+        [HttpPost("withdraw")]
+        public async Task<IActionResult> InitiateWithdraw([FromBody] AmountRequest request)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
+            {
+                TransactionType = "Withdraw",
+                Amount = request.Amount,
+                Reference = "ATM Cash Withdrawal"
+            });
+
+            return StatusCode(statusCode, response);
+        }
+
+        // POST: api/transactions/transfer/initiate (and legacy POST api/transactions/transfer)
+        [HttpPost("transfer/initiate")]
+        [HttpPost("transfer")]
+        public async Task<IActionResult> InitiateTransfer([FromBody] TransferApiRequest request)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
+            {
+                TransactionType = "Transfer",
+                Amount = request.Amount,
+                RecipientAccount = request.RecipientAccountNumber,
+                Reference = request.Memo
+            });
+
+            return StatusCode(statusCode, response);
+        }
+
+        // POST: api/transactions/bills/initiate (and legacy POST api/transactions/pay-bill)
+        [HttpPost("bills/initiate")]
+        [HttpPost("pay-bill")]
+        public async Task<IActionResult> InitiateBillPayment([FromBody] PayBillApiRequest request)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
+            {
+                TransactionType = "BillPayment",
+                Amount = request.Amount,
+                BillerName = request.BillerName,
+                Reference = string.IsNullOrWhiteSpace(request.BillType) 
+                    ? request.ReferenceNumber 
+                    : $"{request.BillType} - Ref: {request.ReferenceNumber}"
+            });
+
+            return StatusCode(statusCode, response);
+        }
+
+        // POST: api/transactions/otp/verify
+        [HttpPost("otp/verify")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequestDto request)
+        {
+            var (statusCode, response) = await _otpTransactionService.VerifyOtpAndCommitAsync(request.ChallengeId, request.Otp);
+            return StatusCode(statusCode, response);
+        }
+
+        // POST: api/transactions/otp/resend
+        [HttpPost("otp/resend")]
+        public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequestDto request)
+        {
+            var (statusCode, response) = await _otpTransactionService.ResendOtpAsync(request.ChallengeId);
+            return StatusCode(statusCode, response);
+        }
+
+        // GET: api/transactions/pending
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPendingTransactions()
+        {
+            var userId = GetCurrentUserId();
+            var pendingTxs = await _otpTransactionService.GetPendingTransactionsAsync(userId);
+            return Ok(ApiResponse<List<PendingTransaction>>.SuccessResponse(pendingTxs));
         }
 
         public class TransactionDto
@@ -246,6 +161,7 @@ namespace SmartBank.Controllers
             public int? RelatedAccountId { get; set; }
         }
 
+        // GET: api/transactions/history
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory()
         {
