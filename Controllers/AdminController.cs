@@ -14,6 +14,9 @@ using SmartBank.Helpers;
 using SmartBank.Security;
 using SmartBank.Services.Interfaces;
 
+using SmartBank.DTOs.Loans;
+using SmartBank.Services.Interfaces;
+
 namespace SmartBank.Controllers
 {
     [Authorize(Roles = "Admin")]
