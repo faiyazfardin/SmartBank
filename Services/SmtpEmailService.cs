@@ -31,18 +31,10 @@ namespace SmartBank.Services
             _port = int.TryParse(configuration["Smtp:Port"], out var p) ? p : 587;
             
             var user = configuration["Smtp:Username"];
-            if (string.IsNullOrWhiteSpace(user) || user.Contains("your-bank-email", StringComparison.OrdinalIgnoreCase))
-            {
-                user = "raisulhasanratul007@gmail.com";
-            }
-            _username = user;
+            _username = user ?? string.Empty;
 
             var pass = configuration["Smtp:Password"];
-            if (string.IsNullOrWhiteSpace(pass) || pass.Contains("your-16-char", StringComparison.OrdinalIgnoreCase))
-            {
-                pass = "tcegahmhjxjyvpfb";
-            }
-            _password = pass.Replace(" ", "").Trim();
+            _password = (pass ?? string.Empty).Replace(" ", "").Trim();
 
             _fromEmail = configuration["Smtp:FromEmail"] ?? _username;
             _fromName = configuration["Smtp:FromName"] ?? "SmartBank Digital";

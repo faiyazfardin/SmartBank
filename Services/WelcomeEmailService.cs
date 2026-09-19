@@ -34,20 +34,8 @@ namespace SmartBank.Services
                 var host = smtpSection["Host"] ?? "smtp.gmail.com";
                 var port = int.TryParse(smtpSection["Port"], out var parsedPort) ? parsedPort : 587;
                 var useStartTls = bool.TryParse(smtpSection["UseStartTls"], out var parsedTls) ? parsedTls : true;
-                var smtpUser = smtpSection["Username"];
-                var smtpPass = smtpSection["Password"];
-
-                if (string.IsNullOrWhiteSpace(smtpUser) || smtpUser.Contains("your-bank-email", StringComparison.OrdinalIgnoreCase))
-                {
-                    smtpUser = "raisulhasanratul007@gmail.com";
-                }
-
-                if (string.IsNullOrWhiteSpace(smtpPass) || smtpPass.Contains("your-16-char", StringComparison.OrdinalIgnoreCase))
-                {
-                    smtpPass = "tcegahmhjxjyvpfb";
-                }
-
-                smtpPass = smtpPass.Replace(" ", "").Trim();
+                var smtpUser = smtpSection["Username"] ?? string.Empty;
+                var smtpPass = (smtpSection["Password"] ?? string.Empty).Replace(" ", "").Trim();
                 var fromEmail = smtpSection["FromEmail"] ?? smtpUser;
                 var fromName = smtpSection["FromName"] ?? "SmartBank Digital";
 
