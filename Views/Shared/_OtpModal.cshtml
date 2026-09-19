@@ -1,0 +1,183 @@
+@model SmartBank.Entities.OtpChallenge
+
+<div class="card shadow-lg border-0 rounded-4 p-4 mx-auto" style="max-width: 480px; background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+    <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); width: 64px; height: 64px;">
+            <i class="bi bi-shield-lock text-info fs-2"></i>
+        </div>
+        <h4 class="fw-bold text-white mb-1">OTP Security Verification</h4>
+        <p class="text-secondary small mb-0">Please enter the 6-digit code dispatched to your email</p>
+    </div>
+
+    <!-- Transaction Context Banner -->
+    <div class="card border-0 rounded-3 p-3 mb-4" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1);">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-secondary small fw-semibold">Transaction Type</span>
+            <span class="badge px-3 py-1-5 rounded-pill fw-bold" style="background: rgba(14, 165, 233, 0.25); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-size: 0.85rem;">@ViewBag.TransactionType</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-secondary small fw-semibold">Amount</span>
+            <span class="fw-bold text-white fs-5">৳@string.Format("{0:N2}", ViewBag.Amount)</span>
+        </div>
+        @if (ViewBag.TargetInfo != null)
+        {
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-secondary small fw-semibold">Details</span>
+                <span class="text-info small fw-medium">@ViewBag.TargetInfo</span>
+            </div>
+        }
+    </div>
+
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small rounded-3 mb-4 py-2 px-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+            <div>@ViewBag.ErrorMessage</div>
+        </div>
+    }
+
+    <!-- OTP Form -->
+    <form asp-action="VerifyOtp" method="post" id="otpForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="challengeId" value="@ViewBag.ChallengeId" />
+
+        <div class="mb-4">
+            <label class="form-label text-secondary small fw-bold text-uppercase tracking-wider text-center d-block">
+                Enter 6-Digit Verification Code
+            </label>
+            <div class="d-flex justify-content-center gap-2" id="otpInputContainer">
+                <input type="text" maxlength="1" class="form-control text-center otp-box" autofocus />
+                <input type="text" maxlength="1" class="form-control text-center otp-box" />
+                <input type="text" maxlength="1" class="form-control text-center otp-box" />
+                <input type="text" maxlength="1" class="form-control text-center otp-box" />
+                <input type="text" maxlength="1" class="form-control text-center otp-box" />
+                <input type="text" maxlength="1" class="form-control text-center otp-box" />
+            </div>
+            <input type="hidden" name="otp" id="combinedOtp" />
+        </div>
+
+        <!-- 2-Minute Live Countdown Timer -->
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center gap-2 px-3 py-1 bg-warning bg-opacity-10 text-warning rounded-pill small fw-semibold" id="timerBadge">
+                <i class="bi bi-clock-history"></i>
+                <span>Expires in: <span id="countdownTimer">02:00</span></span>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-submit-otp btn-lg w-100 rounded-3 shadow-sm mb-3">
+            <i class="bi bi-check-circle-fill me-2"></i> Verify &amp; Complete Transaction
+        </button>
+    </form>
+
+    <!-- Resend OTP Action -->
+    <div class="text-center pt-2 border-top">
+        <span class="text-muted small">Didn't receive the code?</span>
+        <button type="button" class="btn btn-link text-decoration-none small fw-bold text-primary p-0 ms-1" id="btnResendOtp" disabled>
+            Resend OTP <span id="resendCooldown">(60s)</span>
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const boxes = document.querySelectorAll(".otp-box");
+    const combinedInput = document.getElementById("combinedOtp");
+    const form = document.getElementById("otpForm");
+    const timerDisplay = document.getElementById("countdownTimer");
+    const resendBtn = document.getElementById("btnResendOtp");
+    const resendCooldown = document.getElementById("resendCooldown");
+
+    // Auto-advance OTP boxes
+    boxes.forEach((box, index) => {
+        box.addEventListener("input", function (e) {
+            if (box.value.length === 1 && index < boxes.length - 1) {
+                boxes[index + 1].focus();
+            }
+            updateCombined();
+        });
+
+        box.addEventListener("keydown", function (e) {
+            if (e.key === "Backspace" && box.value === "" && index > 0) {
+                boxes[index - 1].focus();
+            }
+        });
+
+        box.addEventListener("paste", function (e) {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData("text").trim();
+            if (/^\d{6}$/.test(pasteData)) {
+                pasteData.split("").forEach((char, i) => {
+                    if (boxes[i]) boxes[i].value = char;
+                });
+                updateCombined();
+                boxes[5].focus();
+            }
+        });
+    });
+
+    function updateCombined() {
+        let val = "";
+        boxes.forEach(b => val += b.value);
+        combinedInput.value = val;
+    }
+
+    form.addEventListener("submit", function(e) {
+        updateCombined();
+        if (combinedInput.value.length !== 6) {
+            e.preventDefault();
+            alert("Please enter the complete 6-digit OTP code.");
+        }
+    });
+
+    // 2-Minute Expiry Timer
+    let totalSeconds = 120;
+    const timerInterval = setInterval(function () {
+        totalSeconds--;
+        if (totalSeconds <= 0) {
+            clearInterval(timerInterval);
+            timerDisplay.textContent = "00:00 - EXPIRED";
+            document.getElementById("timerBadge").className = "d-inline-flex align-items-center gap-2 px-3 py-1 bg-danger bg-opacity-10 text-danger rounded-pill small fw-semibold";
+            alert("OTP expired. Please request a new one.");
+        } else {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            timerDisplay.textContent = String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
+        }
+    }, 1000);
+
+    // 60-Second Resend Cooldown Timer
+    let cooldown = 60;
+    const cooldownInterval = setInterval(function () {
+        cooldown--;
+        if (cooldown <= 0) {
+            clearInterval(cooldownInterval);
+            resendBtn.disabled = false;
+            resendCooldown.textContent = "";
+        } else {
+            resendCooldown.textContent = `(${cooldown}s)`;
+        }
+    }, 1000);
+
+    resendBtn.addEventListener("click", async function () {
+        resendBtn.disabled = true;
+        try {
+            const res = await fetch("/api/transactions/otp/resend", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ challengeId: "@ViewBag.ChallengeId" })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("A new 6-digit OTP has been sent to your email.");
+                location.reload();
+            } else {
+                alert(data.message || "Unable to resend OTP at this time.");
+                resendBtn.disabled = false;
+            }
+        } catch (err) {
+            alert("Error requesting new OTP.");
+            resendBtn.disabled = false;
+        }
+    });
+});
+</script>

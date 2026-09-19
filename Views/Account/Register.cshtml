@@ -89,38 +89,11 @@
                 </div>
             </div>
 
-            <!-- Password & Confirm Password -->
-            <div class="row g-3 mb-2">
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Password *</label>
-                    <div class="input-group auth-input-group">
-                        <span class="input-group-text"><i class="bi bi-key text-warning"></i></span>
-                        <input type="password" id="regPassword" name="password" class="form-control" placeholder="Password" required />
-                        <button class="btn btn-outline-secondary toggle-password-btn" type="button" data-target="regPassword">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold small text-light opacity-90 mb-1">Confirm Password *</label>
-                    <div class="input-group auth-input-group">
-                        <span class="input-group-text"><i class="bi bi-check2-circle text-warning"></i></span>
-                        <input type="password" id="regConfirmPassword" name="confirmPassword" class="form-control" placeholder="Confirm Password" required />
-                        <button class="btn btn-outline-secondary toggle-password-btn" type="button" data-target="regConfirmPassword">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Password Strength Bar -->
-            <div class="mb-3">
-                <div class="progress rounded-pill" style="height: 6px; background-color: rgba(255, 255, 255, 0.1);">
-                    <div id="strengthBar" class="progress-bar rounded-pill transition-all" role="progressbar" style="width: 0%"></div>
-                </div>
-                <div class="d-flex justify-content-between align-items-center mt-1">
-                    <small id="strengthText" class="text-secondary" style="font-size: 0.72rem;">Min 8 chars, 1 number, 1 uppercase</small>
-                    <span class="badge bg-dark text-secondary font-monospace" style="font-size: 0.65rem;">BCrypt Factor 12</span>
+            <!-- Default Password Informational Notice -->
+            <div class="alert alert-info bg-info bg-opacity-10 border border-info border-opacity-25 text-info rounded-3 mb-4 p-3 d-flex align-items-center">
+                <i class="bi bi-info-circle-fill fs-4 me-3 flex-shrink-0 text-info"></i>
+                <div class="small">
+                    <strong>Default Password Notice:</strong> You do not need to enter a password. A secure, system-generated default temporary password will be dispatched directly to your registered email address upon submission.
                 </div>
             </div>
 

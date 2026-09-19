@@ -21,4 +21,17 @@ namespace SmartBank.Client.Models.Transactions
         public string TransactionId { get; set; } = string.Empty;
         public DateTime CompletedAt { get; set; }
     }
+
+    public class ClientOtpChallengeResult
+    {
+        public Guid ChallengeId { get; set; }
+        public Guid TransactionId { get; set; }
+        public string TransactionType { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string? TargetInfo { get; set; }
+        public string MaskedEmail { get; set; } = string.Empty;
+        public DateTime IssuedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+        public int CooldownRemainingSeconds { get; set; } = 60;
+    }
 }

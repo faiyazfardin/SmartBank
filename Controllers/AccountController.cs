@@ -27,19 +27,22 @@ namespace SmartBank.Controllers
         private readonly IEmailService _emailService;
         private readonly IOtpService _otpService;
         private readonly SmartBankDbContext _context;
+        private readonly IWelcomeEmailService _welcomeEmailService;
 
         public AccountController(
             IAuthService authService,
             IConfiguration configuration,
             IEmailService emailService,
             IOtpService otpService,
-            SmartBankDbContext context)
+            SmartBankDbContext context,
+            IWelcomeEmailService welcomeEmailService)
         {
             _authService = authService;
             _configuration = configuration;
             _emailService = emailService;
             _otpService = otpService;
             _context = context;
+            _welcomeEmailService = welcomeEmailService;
         }
 
         [HttpGet]
@@ -105,51 +108,132 @@ namespace SmartBank.Controllers
             }
 
             var userData = response.Data;
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, userData.UserId.ToString()),
-                new Claim("sub", userData.UserId.ToString()),
-                new Claim(ClaimTypes.Name, userData.Username),
-                new Claim(ClaimTypes.Email, userData.Email),
-                new Claim("FullName", userData.FullName),
-                new Claim(ClaimTypes.Role, userData.Role)
-            };
+            var dbUser = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == userData.UserId);
 
-            if (!string.IsNullOrEmpty(userData.AccountNumber))
+            if (dbUser == null)
             {
-                claims.Add(new Claim("AccountNumber", userData.AccountNumber));
+                ViewBag.Error = "User account not found.";
+                return View();
             }
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
-
-            var authProperties = new AuthenticationProperties
+            // Check Account Status FIRST before sending OTP or allowing login
+            if (!string.Equals(dbUser.Status, "Active", StringComparison.OrdinalIgnoreCase))
             {
-                IsPersistent = rememberMe,
-                ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(14) : DateTimeOffset.UtcNow.AddHours(8)
-            };
-
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
-
-            var dbUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userData.UserId);
-            if (dbUser != null && dbUser.MustChangePasswordOnNextLogin)
-            {
-                return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                if (string.Equals(dbUser.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    ViewBag.Error = $"Your account with NID: {dbUser.NidNumber ?? "N/A"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
+                }
+                else
+                {
+                    ViewBag.Error = $"Your account status is '{dbUser.Status}'. Access is restricted. Please contact administrator support.";
+                }
+                return View();
             }
 
-            TempData["SuccessToast"] = $"Welcome back, {userData.FullName}!";
-
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            // ADMIN ROLE EXEMPTION: Admin accounts bypass login OTP verification completely
+            if (string.Equals(dbUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
             {
-                return Redirect(returnUrl);
-            }
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.NameIdentifier, dbUser.Id.ToString()),
+                    new Claim("sub", dbUser.Id.ToString()),
+                    new Claim(ClaimTypes.Name, dbUser.Username),
+                    new Claim(ClaimTypes.Email, dbUser.Email),
+                    new Claim("FullName", dbUser.FullName),
+                    new Claim(ClaimTypes.Role, dbUser.Role)
+                };
 
-            if (userData.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
-            {
+                if (!string.IsNullOrEmpty(userData.AccountNumber))
+                {
+                    claims.Add(new Claim("AccountNumber", userData.AccountNumber));
+                }
+
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = rememberMe,
+                    ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(14) : DateTimeOffset.UtcNow.AddHours(8)
+                };
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
+
+                if (dbUser.MustChangePasswordOnNextLogin)
+                {
+                    return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                }
+
+                TempData["SuccessToast"] = $"Welcome back Administrator, {dbUser.FullName}!";
+
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    return Redirect(returnUrl);
+                }
+
                 return RedirectToAction("Users", "Admin");
             }
 
-            return RedirectToAction("Index", "Dashboard");
+            // EXCEPTION RULE: If user is logging in using the default temporary password provided via mail upon admin approval
+            if (dbUser.MustChangePasswordOnNextLogin)
+            {
+                // OTP is NOT needed. Sign in directly and force password change.
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.NameIdentifier, dbUser.Id.ToString()),
+                    new Claim("sub", dbUser.Id.ToString()),
+                    new Claim(ClaimTypes.Name, dbUser.Username),
+                    new Claim(ClaimTypes.Email, dbUser.Email),
+                    new Claim("FullName", dbUser.FullName),
+                    new Claim(ClaimTypes.Role, dbUser.Role)
+                };
+
+                if (!string.IsNullOrEmpty(userData.AccountNumber))
+                {
+                    claims.Add(new Claim("AccountNumber", userData.AccountNumber));
+                }
+
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var authProperties = new AuthenticationProperties
+                {
+                    IsPersistent = rememberMe,
+                    ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(14) : DateTimeOffset.UtcNow.AddHours(8)
+                };
+
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProperties);
+                return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+            }
+
+            // DEFAULT RULE: All Admin-verified Active accounts require 6-digit email OTP after login
+            var rawOtp = _otpService.GenerateCode(6);
+            var salt = Guid.NewGuid().ToString("N");
+            var codeHash = _otpService.Hash(rawOtp, salt);
+
+            var otpRecord = new OtpVerification
+            {
+                Id = Guid.NewGuid(),
+                UserId = dbUser.Id,
+                Email = dbUser.Email.Trim().ToLowerInvariant(),
+                CodeHash = codeHash,
+                Salt = salt,
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(2),
+                AttemptCount = 0,
+                IsUsed = false,
+                Purpose = OtpPurpose.Login
+            };
+
+            _context.OtpVerifications.Add(otpRecord);
+            await _context.SaveChangesAsync();
+
+            await _emailService.SendOtpAsync(dbUser.Email, rawOtp);
+
+            TempData["OtpSession_Email"] = dbUser.Email;
+            TempData["OtpSession_UserId"] = dbUser.Id.ToString();
+            TempData["OtpSession_FullName"] = dbUser.FullName;
+            TempData["OtpSession_ReturnUrl"] = returnUrl;
+            TempData["OtpSession_RememberMe"] = rememberMe ? "true" : "false";
+
+            return RedirectToAction(nameof(VerifyOtp));
         }
 
         [HttpGet]
@@ -164,7 +248,7 @@ namespace SmartBank.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(string? fullName, string? firstName, string? lastName, string email, string username, string? phoneNumber, string nidNumber, string password, string confirmPassword)
+        public async Task<IActionResult> Register(string? fullName, string? firstName, string? lastName, string email, string username, string? phoneNumber, string nidNumber)
         {
             if (string.IsNullOrWhiteSpace(fullName))
             {
@@ -172,18 +256,14 @@ namespace SmartBank.Controllers
             }
 
             if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(email) ||
-                string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(nidNumber) ||
-                string.IsNullOrWhiteSpace(password))
+                string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(nidNumber))
             {
                 ViewBag.Error = "Please fill in all required fields, including your NID Number.";
                 return View();
             }
 
-            if (password != confirmPassword)
-            {
-                ViewBag.Error = "Passwords do not match.";
-                return View();
-            }
+            // Auto-generate secure default password containing upper, lower, number & special char
+            var defaultPassword = SmartBank.Helpers.PasswordGeneratorHelper.GenerateSecurePassword(10);
 
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             var registerReq = new RegisterRequest
@@ -193,8 +273,8 @@ namespace SmartBank.Controllers
                 Username = username.Trim(),
                 PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim(),
                 NidNumber = nidNumber.Trim(),
-                Password = password,
-                ConfirmPassword = confirmPassword
+                Password = defaultPassword,
+                ConfirmPassword = defaultPassword
             };
 
             try
@@ -210,7 +290,10 @@ namespace SmartBank.Controllers
                     return View();
                 }
 
-                TempData["SuccessToast"] = $"Registration submitted successfully! Your account with NID: {nidNumber.Trim()} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
+                // Dispatch welcome email with default system-generated password
+                await _welcomeEmailService.SendWelcomeEmailAsync(email.Trim(), fullName.Trim(), username.Trim(), defaultPassword);
+
+                TempData["SuccessToast"] = $"Registration submitted successfully! Your account with NID: {nidNumber.Trim()} is pending administrator verification. A system-generated default temporary password has been sent to your email address ({email.Trim()}).";
                 return RedirectToAction("Login");
             }
             catch (Exception ex)
@@ -319,53 +402,123 @@ namespace SmartBank.Controllers
                     return RedirectToAction(nameof(CompleteGoogleProfile));
                 }
 
-                if (user.Status == "Pending")
+                // Rule A: Check Account Status FIRST
+                if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
                 {
                     await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                     try { await HttpContext.SignOutAsync(GoogleDefaults.AuthenticationScheme); } catch { }
-                    TempData["ErrorToast"] = $"Your account with NID: {user.NidNumber ?? "N/A"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
+
+                    if (string.Equals(user.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        TempData["ErrorToast"] = $"Your account with NID: {user.NidNumber ?? "N/A"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
+                    }
+                    else
+                    {
+                        TempData["ErrorToast"] = $"Your account status is '{user.Status}'. Access is restricted. Please contact support.";
+                    }
                     return RedirectToAction(nameof(Login));
                 }
 
-                if (user.Status == "Suspended")
+                // ADMIN ROLE EXEMPTION: Admin accounts bypass login OTP verification completely
+                if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
                 {
-                    await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    try { await HttpContext.SignOutAsync(GoogleDefaults.AuthenticationScheme); } catch { }
-                    TempData["ErrorToast"] = "Your account has been suspended. Access denied.";
-                    return RedirectToAction(nameof(Login));
+                    var defaultAccount = user.Accounts.FirstOrDefault();
+                    var claims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                        new Claim("sub", user.Id.ToString()),
+                        new Claim(ClaimTypes.Name, user.Username),
+                        new Claim(ClaimTypes.Email, user.Email),
+                        new Claim("FullName", user.FullName),
+                        new Claim(ClaimTypes.Role, user.Role)
+                    };
+                    if (defaultAccount != null)
+                    {
+                        claims.Add(new Claim("AccountNumber", defaultAccount.AccountNumber));
+                    }
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var authPrincipal = new ClaimsPrincipal(identity);
+                    var authProperties = new AuthenticationProperties
+                    {
+                        IsPersistent = true,
+                        ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14)
+                    };
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authPrincipal, authProperties);
+
+                    if (user.MustChangePasswordOnNextLogin)
+                    {
+                        return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                    }
+
+                    TempData["SuccessToast"] = $"Welcome back Administrator via Google, {user.FullName}!";
+                    if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
+
+                    return RedirectToAction("Users", "Admin");
                 }
 
-                // Active User -> Log in directly with Cookie Auth
-                var defaultAccount = user.Accounts.FirstOrDefault();
-                var claims = new List<Claim>
+                // EXCEPTION RULE: If user account requires default temporary password change upon admin approval
+                if (user.MustChangePasswordOnNextLogin)
                 {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim("sub", user.Id.ToString()),
-                    new Claim(ClaimTypes.Name, user.Username),
-                    new Claim(ClaimTypes.Email, user.Email),
-                    new Claim("FullName", user.FullName),
-                    new Claim(ClaimTypes.Role, user.Role)
-                };
-                if (defaultAccount != null)
-                {
-                    claims.Add(new Claim("AccountNumber", defaultAccount.AccountNumber));
+                    // OTP is NOT needed. Sign in directly and force password change.
+                    var defaultAccount = user.Accounts.FirstOrDefault();
+                    var claims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                        new Claim("sub", user.Id.ToString()),
+                        new Claim(ClaimTypes.Name, user.Username),
+                        new Claim(ClaimTypes.Email, user.Email),
+                        new Claim("FullName", user.FullName),
+                        new Claim(ClaimTypes.Role, user.Role)
+                    };
+                    if (defaultAccount != null)
+                    {
+                        claims.Add(new Claim("AccountNumber", defaultAccount.AccountNumber));
+                    }
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var authPrincipal = new ClaimsPrincipal(identity);
+                    var authProperties = new AuthenticationProperties
+                    {
+                        IsPersistent = true,
+                        ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14)
+                    };
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authPrincipal, authProperties);
+
+                    return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
                 }
 
-                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var authPrincipal = new ClaimsPrincipal(identity);
-                var authProperties = new AuthenticationProperties
+                // DEFAULT RULE: Active Admin-verified account requires 6-digit email OTP after Google login
+                var rawOtp = _otpService.GenerateCode(6);
+                var salt = Guid.NewGuid().ToString("N");
+                var codeHash = _otpService.Hash(rawOtp, salt);
+
+                var otpRecord = new OtpVerification
                 {
-                    IsPersistent = true,
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14)
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    Email = cleanEmail,
+                    CodeHash = codeHash,
+                    Salt = salt,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ExpiresAtUtc = DateTime.UtcNow.AddMinutes(2),
+                    AttemptCount = 0,
+                    IsUsed = false,
+                    Purpose = OtpPurpose.GoogleLogin
                 };
-                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authPrincipal, authProperties);
 
-                TempData["SuccessToast"] = $"Welcome back via Google, {user.FullName}!";
-                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
+                _context.OtpVerifications.Add(otpRecord);
+                await _context.SaveChangesAsync();
 
-                return user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
-                    ? RedirectToAction("Users", "Admin")
-                    : RedirectToAction("Index", "Dashboard");
+                await _emailService.SendOtpAsync(cleanEmail, rawOtp);
+
+                TempData["OtpSession_Email"] = cleanEmail;
+                TempData["OtpSession_UserId"] = user.Id.ToString();
+                TempData["OtpSession_GoogleSubjectId"] = googleSubjectId;
+                TempData["OtpSession_FullName"] = user.FullName;
+                TempData["OtpSession_ReturnUrl"] = returnUrl;
+
+                return RedirectToAction(nameof(VerifyOtp));
             }
             catch (Exception ex)
             {
@@ -389,9 +542,11 @@ namespace SmartBank.Controllers
             }
 
             TempData.Keep("OtpSession_Email");
+            TempData.Keep("OtpSession_UserId");
             TempData.Keep("OtpSession_GoogleSubjectId");
             TempData.Keep("OtpSession_FullName");
             TempData.Keep("OtpSession_ReturnUrl");
+            TempData.Keep("OtpSession_RememberMe");
 
             ViewBag.Email = email;
             return View();
@@ -402,9 +557,12 @@ namespace SmartBank.Controllers
         public async Task<IActionResult> VerifyOtp(string code)
         {
             var email = TempData["OtpSession_Email"] as string;
+            var userIdStr = TempData["OtpSession_UserId"] as string;
             var googleSubjectId = TempData["OtpSession_GoogleSubjectId"] as string;
             var fullName = TempData["OtpSession_FullName"] as string ?? "Customer";
             var returnUrl = TempData["OtpSession_ReturnUrl"] as string;
+            var rememberMeStr = TempData["OtpSession_RememberMe"] as string;
+            bool rememberMe = rememberMeStr == "true";
 
             if (string.IsNullOrEmpty(email))
             {
@@ -413,9 +571,11 @@ namespace SmartBank.Controllers
             }
 
             TempData.Keep("OtpSession_Email");
+            TempData.Keep("OtpSession_UserId");
             TempData.Keep("OtpSession_GoogleSubjectId");
             TempData.Keep("OtpSession_FullName");
             TempData.Keep("OtpSession_ReturnUrl");
+            TempData.Keep("OtpSession_RememberMe");
 
             if (string.IsNullOrWhiteSpace(code) || code.Length != 6)
             {
@@ -460,29 +620,36 @@ namespace SmartBank.Controllers
             otpRecord.IsUsed = true;
             await _context.SaveChangesAsync();
 
-            // Check if User already exists in Database
-            var user = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            // Retrieve user
+            User? user = null;
+            if (int.TryParse(userIdStr, out var uId))
+            {
+                user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == uId);
+            }
+            if (user == null)
+            {
+                user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            }
 
             if (user == null)
             {
-                // New user -> redirect to Profile Completion
+                // New user via Google -> redirect to Profile Completion
                 TempData["GoogleReg_Email"] = cleanEmail;
                 TempData["GoogleReg_SubjectId"] = googleSubjectId;
                 TempData["GoogleReg_FullName"] = fullName;
                 return RedirectToAction(nameof(CompleteGoogleProfile));
             }
 
-            if (user.Status == "Pending")
+            if (!string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
             {
-                TempData["ErrorToast"] = $"Your account with NID: {user.NidNumber ?? "N/A"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
-                return RedirectToAction(nameof(Login));
-            }
-
-            if (user.Status == "Suspended")
-            {
-                TempData["ErrorToast"] = "Your account has been suspended. Access denied.";
+                if (string.Equals(user.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    TempData["ErrorToast"] = $"Your account with NID: {user.NidNumber ?? "N/A"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in.";
+                }
+                else
+                {
+                    TempData["ErrorToast"] = $"Your account status is '{user.Status}'. Access is restricted. Please contact support.";
+                }
                 return RedirectToAction(nameof(Login));
             }
 
@@ -506,12 +673,18 @@ namespace SmartBank.Controllers
             var authPrincipal = new ClaimsPrincipal(identity);
             var authProperties = new AuthenticationProperties
             {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14)
+                IsPersistent = rememberMe,
+                ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(14) : DateTimeOffset.UtcNow.AddHours(8)
             };
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authPrincipal, authProperties);
 
-            TempData["SuccessToast"] = $"Welcome back via Google, {user.FullName}!";
+            TempData["SuccessToast"] = $"Welcome back, {user.FullName}!";
+
+            if (user.MustChangePasswordOnNextLogin)
+            {
+                return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+            }
+
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
 
             return user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
@@ -524,13 +697,37 @@ namespace SmartBank.Controllers
         public async Task<IActionResult> ResendOtp()
         {
             var email = TempData["OtpSession_Email"] as string;
+            var userIdStr = TempData["OtpSession_UserId"] as string;
+
             if (string.IsNullOrEmpty(email))
             {
                 return Json(new { success = false, message = "Verification session expired." });
             }
 
             TempData.Keep("OtpSession_Email");
+            TempData.Keep("OtpSession_UserId");
+            TempData.Keep("OtpSession_GoogleSubjectId");
+            TempData.Keep("OtpSession_FullName");
+            TempData.Keep("OtpSession_ReturnUrl");
+            TempData.Keep("OtpSession_RememberMe");
+
             var cleanEmail = email.Trim().ToLowerInvariant();
+
+            // Check Account Status before resending
+            User? user = null;
+            if (int.TryParse(userIdStr, out var uId))
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == uId);
+            }
+            if (user == null)
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            }
+
+            if (user != null && !string.Equals(user.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new { success = false, message = $"Account status is '{user.Status}'. Verification code cannot be sent." });
+            }
 
             // Rate Limit: 60s cooldown
             var lastOtp = await _context.OtpVerifications
@@ -552,12 +749,14 @@ namespace SmartBank.Controllers
 
             var newRecord = new OtpVerification
             {
+                Id = Guid.NewGuid(),
+                UserId = user?.Id,
                 Email = cleanEmail,
                 CodeHash = codeHash,
                 Salt = salt,
                 CreatedAtUtc = DateTime.UtcNow,
-                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-                Purpose = OtpPurpose.GoogleLogin
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(2),
+                Purpose = OtpPurpose.Login
             };
 
             _context.OtpVerifications.Add(newRecord);
@@ -565,7 +764,7 @@ namespace SmartBank.Controllers
 
             await _emailService.SendOtpAsync(cleanEmail, rawOtp);
 
-            return Json(new { success = true, message = "New verification code has been dispatched to your email." });
+            return Json(new { success = true, message = "New 6-digit verification code has been dispatched to your email." });
         }
 
         [HttpGet]
@@ -676,9 +875,10 @@ namespace SmartBank.Controllers
         {
             ViewBag.IsForced = forced;
 
-            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+            var (isValid, errorMessage) = SmartBank.Security.PasswordValidator.Validate(newPassword);
+            if (!isValid)
             {
-                ViewBag.Error = "New password must be at least 8 characters long.";
+                ViewBag.Error = errorMessage;
                 return View();
             }
 

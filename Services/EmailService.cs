@@ -43,8 +43,25 @@ namespace SmartBank.Services
             LatestSentOtps[toEmail.ToLowerInvariant()] = otpCode;
 
             _logger.LogInformation(
-                "[EMAIL DISPATCHED] Transfer OTP to {ToEmail} for ${Amount:N2} to {RecipientAccount}. Verification Code: {OtpCode} (Expires in 5 mins)",
+                "[EMAIL DISPATCHED] Transfer OTP to {ToEmail} for ৳{Amount:N2} to {RecipientAccount}. Verification Code: {OtpCode} (Expires in 5 mins)",
                 toEmail, amount, maskedRecipient, otpCode);
+
+            return Task.CompletedTask;
+        }
+
+        public Task SendUniversalTransactionOtpAsync(
+            string toEmail,
+            string userName,
+            string transactionType,
+            decimal amount,
+            string? targetInfo,
+            string? reference,
+            string otpCode)
+        {
+            LatestSentOtps[toEmail.ToLowerInvariant()] = otpCode;
+            _logger.LogInformation(
+                "[UNIVERSAL OTP DISPATCHED] To: {ToEmail} | Type: {Type} | Amount: ৳{Amount:N2} | Target: {Target} | OTP: {OtpCode}",
+                toEmail, transactionType, amount, targetInfo ?? "N/A", otpCode);
 
             return Task.CompletedTask;
         }
@@ -54,8 +71,23 @@ namespace SmartBank.Services
             var maskedRecipient = MaskAccountNumber(recipientAccountNumber);
 
             _logger.LogInformation(
-                "[EMAIL DISPATCHED] Transfer Confirmation to {ToEmail}. Amount: ${Amount:N2}, Recipient: {RecipientAccount}, TxnId: {TxnId}",
+                "[EMAIL DISPATCHED] Transfer Confirmation to {ToEmail}. Amount: ৳{Amount:N2}, Recipient: {RecipientAccount}, TxnId: {TxnId}",
                 toEmail, amount, maskedRecipient, transactionId);
+
+            return Task.CompletedTask;
+        }
+
+        public Task SendUniversalTransactionConfirmationAsync(
+            string toEmail,
+            string userName,
+            string transactionType,
+            decimal amount,
+            string trackingId,
+            decimal newBalance)
+        {
+            _logger.LogInformation(
+                "[UNIVERSAL CONFIRMATION DISPATCHED] To: {ToEmail} | Type: {Type} | Amount: ৳{Amount:N2} | TrackingId: {TrackingId} | NewBalance: ৳{NewBalance:N2}",
+                toEmail, transactionType, amount, trackingId, newBalance);
 
             return Task.CompletedTask;
         }

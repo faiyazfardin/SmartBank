@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -7,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
+using SmartBank.DTOs.Transactions;
 using SmartBank.Entities;
 using SmartBank.Services.Interfaces;
 
@@ -16,12 +16,14 @@ namespace SmartBank.Controllers
     public class TransactionController : Controller
     {
         private readonly SmartBankDbContext _context;
-        private readonly ITransferService _transferService;
+        private readonly IOtpTransactionService _otpTransactionService;
 
-        public TransactionController(SmartBankDbContext context, ITransferService transferService)
+        public TransactionController(
+            SmartBankDbContext context,
+            IOtpTransactionService otpTransactionService)
         {
             _context = context;
-            _transferService = transferService;
+            _otpTransactionService = otpTransactionService;
         }
 
         private int GetCurrentUserId()
@@ -76,41 +78,26 @@ namespace SmartBank.Controllers
             return View(account);
         }
 
-        // POST: Transaction/Deposit
+        // POST: Transaction/Deposit -> Initiates Pending Transaction & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Deposit(decimal amount)
         {
-            if (amount <= 0)
-            {
-                TempData["ErrorToast"] = "Deposit amount must be greater than ৳0.";
-                return RedirectToAction("Deposit");
-            }
-
             var userId = GetCurrentUserId();
-            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
-            if (error != null || account == null)
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
-                TempData["ErrorToast"] = error ?? "Unable to process deposit.";
+                TransactionType = "Deposit",
+                Amount = amount,
+                Reference = "Account Deposit Credit"
+            });
+
+            if (statusCode != 200 || response.Data == null)
+            {
+                TempData["ErrorToast"] = response.Message ?? "Failed to initiate deposit.";
                 return RedirectToAction("Deposit");
             }
 
-            account.Balance += amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Deposit,
-                Amount = amount,
-                Timestamp = DateTime.UtcNow
-            };
-
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessToast"] = $"Successfully deposited ৳{amount:N2} to your account! New Balance: ৳{account.Balance:N2}";
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("VerifyOtp", new { challengeId = response.Data.ChallengeId });
         }
 
         // GET: Transaction/Withdraw
@@ -123,47 +110,26 @@ namespace SmartBank.Controllers
             return View(account);
         }
 
-        // POST: Transaction/Withdraw
+        // POST: Transaction/Withdraw -> Initiates Pending Transaction & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Withdraw(decimal amount)
         {
-            if (amount <= 0)
-            {
-                TempData["ErrorToast"] = "Withdrawal amount must be greater than ৳0.";
-                return RedirectToAction("Withdraw");
-            }
-
             var userId = GetCurrentUserId();
-            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
-            if (error != null || account == null)
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
-                TempData["ErrorToast"] = error ?? "Unable to process withdrawal.";
-                return RedirectToAction("Withdraw");
-            }
-
-            if (amount > account.Balance)
-            {
-                TempData["ErrorToast"] = $"Insufficient balance! Available balance is ৳{account.Balance:N2}.";
-                return RedirectToAction("Withdraw");
-            }
-
-            account.Balance -= amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Withdraw,
+                TransactionType = "Withdraw",
                 Amount = amount,
-                Timestamp = DateTime.UtcNow
-            };
+                Reference = "ATM Cash Withdrawal"
+            });
 
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
+            if (statusCode != 200 || response.Data == null)
+            {
+                TempData["ErrorToast"] = response.Message ?? "Failed to initiate withdrawal.";
+                return RedirectToAction("Withdraw");
+            }
 
-            TempData["SuccessToast"] = $"Successfully withdrew ৳{amount:N2}! Remaining Balance: ৳{account.Balance:N2}";
-            return RedirectToAction("Index", "Dashboard");
+            return RedirectToAction("VerifyOtp", new { challengeId = response.Data.ChallengeId });
         }
 
         // GET: Transaction/Transfer
@@ -186,7 +152,13 @@ namespace SmartBank.Controllers
         public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount, string? memo)
         {
             var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.InitiateTransferAsync(userId, recipientAccountNumber, amount, memo);
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
+            {
+                TransactionType = "Transfer",
+                Amount = amount,
+                RecipientAccount = recipientAccountNumber,
+                Reference = memo
+            });
 
             if (statusCode != 200 || response.Data == null)
             {
@@ -194,83 +166,7 @@ namespace SmartBank.Controllers
                 return RedirectToAction("Transfer");
             }
 
-            // Redirect to OTP verification screen
-            return RedirectToAction("VerifyTransferOtp", new { requestId = response.Data.TransferRequestId });
-        }
-
-        // GET: Transaction/VerifyTransferOtp
-        [HttpGet]
-        public async Task<IActionResult> VerifyTransferOtp(int requestId)
-        {
-            var userId = GetCurrentUserId();
-            var pendingTransfer = await _transferService.GetPendingTransferAsync(userId, requestId);
-
-            if (pendingTransfer == null || pendingTransfer.Status != TransferRequestStatus.PendingOtp)
-            {
-                TempData["ErrorToast"] = "No pending transfer found for verification.";
-                return RedirectToAction("Transfer");
-            }
-
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            ViewBag.MaskedEmail = user != null ? (user.Email.Length > 4 ? $"{user.Email[0]}***{user.Email[^1]}@{user.Email.Split('@')[1]}" : user.Email) : "your email";
-            ViewBag.RecipientAccount = pendingTransfer.DestinationAccount?.AccountNumber ?? "N/A";
-            ViewBag.Amount = pendingTransfer.Amount;
-            ViewBag.RequestId = requestId;
-            ViewBag.ExpiresAt = pendingTransfer.ExpiresAt;
-
-            return View(pendingTransfer);
-        }
-
-        // POST: Transaction/VerifyTransferOtp
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> VerifyTransferOtp(int requestId, string otp)
-        {
-            var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.VerifyAndCompleteTransferAsync(userId, requestId, otp);
-
-            if (statusCode != 200 || !response.Success)
-            {
-                ViewBag.ErrorMessage = response.Message ?? "Invalid verification code.";
-                var pendingTransfer = await _transferService.GetPendingTransferAsync(userId, requestId);
-                if (pendingTransfer == null || pendingTransfer.Status != TransferRequestStatus.PendingOtp)
-                {
-                    TempData["ErrorToast"] = response.Message ?? "Transfer failed.";
-                    return RedirectToAction("Transfer");
-                }
-
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-                ViewBag.MaskedEmail = user != null ? (user.Email.Length > 4 ? $"{user.Email[0]}***{user.Email[^1]}@{user.Email.Split('@')[1]}" : user.Email) : "your email";
-                ViewBag.RecipientAccount = pendingTransfer.DestinationAccount?.AccountNumber ?? "N/A";
-                ViewBag.Amount = pendingTransfer.Amount;
-                ViewBag.RequestId = requestId;
-                ViewBag.ExpiresAt = pendingTransfer.ExpiresAt;
-
-                return View(pendingTransfer);
-            }
-
-            TempData["SuccessToast"] = response.Message ?? "Transfer completed successfully!";
-            return RedirectToAction("Index", "Dashboard");
-        }
-
-        // POST: Transaction/ResendTransferOtp
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ResendTransferOtp(int requestId)
-        {
-            var userId = GetCurrentUserId();
-            var (statusCode, response) = await _transferService.ResendTransferOtpAsync(userId, requestId);
-
-            if (statusCode == 200)
-            {
-                TempData["SuccessToast"] = response.Message ?? "A new verification code has been dispatched.";
-            }
-            else
-            {
-                TempData["ErrorToast"] = response.Message ?? "Could not resend verification code.";
-            }
-
-            return RedirectToAction("VerifyTransferOtp", new { requestId });
+            return RedirectToAction("VerifyOtp", new { challengeId = response.Data.ChallengeId });
         }
 
         // GET: Transaction/PayBill
@@ -283,173 +179,113 @@ namespace SmartBank.Controllers
             return View(account);
         }
 
-        // POST: Transaction/PayBill
+        // POST: Transaction/PayBill -> Initiates Pending Bill Payment & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> PayBill(string billerCategory, string billerName, string billNumber, decimal amount)
+        public async Task<IActionResult> PayBill(string billerName, string billType, string referenceNumber, decimal amount)
         {
-            if (string.IsNullOrWhiteSpace(billerName) || string.IsNullOrWhiteSpace(billNumber))
-            {
-                TempData["ErrorToast"] = "Please provide both biller details and account/meter number.";
-                return RedirectToAction("PayBill");
-            }
-
-            if (amount <= 0)
-            {
-                TempData["ErrorToast"] = "Bill payment amount must be greater than ৳0.";
-                return RedirectToAction("PayBill");
-            }
-
             var userId = GetCurrentUserId();
-            var (account, error) = await CheckAccountAndSuspensionAsync(userId);
-            if (error != null || account == null)
+            var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
-                TempData["ErrorToast"] = error ?? "Unable to process payment.";
-                return RedirectToAction("PayBill");
-            }
-
-            if (amount > account.Balance)
-            {
-                TempData["ErrorToast"] = $"Insufficient balance! Available balance is ৳{account.Balance:N2}.";
-                return RedirectToAction("PayBill");
-            }
-
-            account.Balance -= amount;
-            account.UpdatedAt = DateTime.UtcNow;
-
-            var transaction = new Transaction
-            {
-                AccountId = account.Id,
-                Type = TransactionType.Withdraw, // Utility bill treated as debit
+                TransactionType = "BillPayment",
                 Amount = amount,
-                Timestamp = DateTime.UtcNow
-            };
+                BillerName = billerName,
+                Reference = $"{billType} - Ref: {referenceNumber}"
+            });
 
-            _context.Transactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessToast"] = $"Successfully paid ৳{amount:N2} to {billerName} (Ref: {billNumber})!";
-            return RedirectToAction("Receipt", new { id = transaction.Id, biller = billerName, billRef = billNumber, category = billerCategory });
-        }
-
-        // GET: Transaction/History
-        [HttpGet]
-        public async Task<IActionResult> History(string? type, string? search)
-        {
-            var userId = GetCurrentUserId();
-            var user = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Id == userId);
-
-            var account = user?.Accounts.FirstOrDefault();
-            if (account == null)
+            if (statusCode != 200 || response.Data == null)
             {
-                return View(new List<Transaction>());
+                TempData["ErrorToast"] = response.Message ?? "Failed to initiate bill payment.";
+                return RedirectToAction("PayBill");
             }
 
-            var query = _context.Transactions
-                .Where(t => t.AccountId == account.Id);
+            return RedirectToAction("VerifyOtp", new { challengeId = response.Data.ChallengeId });
+        }
 
-            if (!string.IsNullOrWhiteSpace(type))
+        // GET: Transaction/VerifyOtp?challengeId={guid}
+        [HttpGet]
+        public async Task<IActionResult> VerifyOtp(Guid challengeId)
+        {
+            var userId = GetCurrentUserId();
+            var challenge = await _context.OtpChallenges
+                .Include(c => c.User)
+                .Include(c => c.PendingTransaction)
+                .FirstOrDefaultAsync(c => c.Id == challengeId && c.UserId == userId);
+
+            if (challenge == null || challenge.IsUsed || challenge.Status == "Used" || challenge.Status == "Expired")
             {
-                if (Enum.TryParse<TransactionType>(type, true, out var tType))
+                TempData["ErrorToast"] = "No active pending OTP challenge found.";
+                return RedirectToAction("Index", "Dashboard");
+            }
+
+            ViewBag.ChallengeId = challenge.Id;
+            ViewBag.TransactionType = challenge.TransactionType;
+            ViewBag.Amount = challenge.TransactionAmount;
+            ViewBag.TargetInfo = challenge.TargetInfo;
+            ViewBag.MaskedEmail = challenge.User != null ? (challenge.User.Email.Length > 4 ? $"{challenge.User.Email[0]}***@{challenge.User.Email.Split('@')[1]}" : challenge.User.Email) : "your email";
+            ViewBag.ExpiresAt = challenge.ExpiresAt;
+
+            return View(challenge);
+        }
+
+        // POST: Transaction/VerifyOtp
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VerifyOtp(Guid challengeId, string otp)
+        {
+            var (statusCode, response) = await _otpTransactionService.VerifyOtpAndCommitAsync(challengeId, otp);
+
+            if (statusCode != 200 || !response.Success || response.Data == null)
+            {
+                ViewBag.ErrorMessage = response.Message ?? "Invalid OTP verification code.";
+                
+                var userId = GetCurrentUserId();
+                var challenge = await _context.OtpChallenges
+                    .Include(c => c.User)
+                    .Include(c => c.PendingTransaction)
+                    .FirstOrDefaultAsync(c => c.Id == challengeId && c.UserId == userId);
+
+                if (challenge == null || challenge.Status == "Expired" || challenge.Status == "Locked")
                 {
-                    query = query.Where(t => t.Type == tType);
+                    TempData["ErrorToast"] = response.Message ?? "OTP challenge invalid or expired.";
+                    return RedirectToAction("Index", "Dashboard");
                 }
+
+                ViewBag.ChallengeId = challenge.Id;
+                ViewBag.TransactionType = challenge.TransactionType;
+                ViewBag.Amount = challenge.TransactionAmount;
+                ViewBag.TargetInfo = challenge.TargetInfo;
+                ViewBag.MaskedEmail = challenge.User != null ? (challenge.User.Email.Length > 4 ? $"{challenge.User.Email[0]}***@{challenge.User.Email.Split('@')[1]}" : challenge.User.Email) : "your email";
+                ViewBag.ExpiresAt = challenge.ExpiresAt;
+
+                return View(challenge);
             }
 
-            var transactions = await query
-                .OrderByDescending(t => t.Timestamp)
-                .ToListAsync();
-
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var s = search.Trim();
-                transactions = transactions
-                    .Where(t => t.Id.ToString().Contains(s, StringComparison.OrdinalIgnoreCase)
-                             || t.Amount.ToString().Contains(s, StringComparison.OrdinalIgnoreCase)
-                             || t.Type.ToString().Contains(s, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            ViewBag.SelectedType = type;
-            ViewBag.Search = search;
-            ViewBag.Account = account;
-            return View(transactions);
+            TempData["SuccessToast"] = response.Message;
+            return RedirectToAction("Success", new { trackingId = response.Data.TrackingId });
         }
 
-        // GET: Transaction/Statement
+        // GET: Transaction/Success?trackingId={id}
         [HttpGet]
-        public async Task<IActionResult> Statement(DateTime? fromDate, DateTime? toDate)
+        public async Task<IActionResult> Success(string trackingId)
         {
             var userId = GetCurrentUserId();
-            var user = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            var pendingTx = await _context.PendingTransactions
+                .Include(p => p.Account)
+                .FirstOrDefaultAsync(p => p.TrackingId == trackingId && p.UserId == userId);
 
-            if (user == null || !user.Accounts.Any())
+            if (pendingTx == null)
             {
                 return RedirectToAction("Index", "Dashboard");
             }
 
-            var account = user.Accounts.First();
-            var start = fromDate ?? DateTime.UtcNow.AddMonths(-1);
-            var end = toDate ?? DateTime.UtcNow;
+            ViewBag.TrackingId = trackingId;
+            ViewBag.TransactionType = pendingTx.TransactionType;
+            ViewBag.Amount = pendingTx.Amount;
+            ViewBag.NewBalance = pendingTx.Account?.Balance ?? 0m;
+            ViewBag.CompletedAt = pendingTx.CompletedAt ?? DateTime.UtcNow;
 
-            var transactions = await _context.Transactions
-                .Where(t => t.AccountId == account.Id && t.Timestamp >= start && t.Timestamp <= end.AddDays(1))
-                .OrderByDescending(t => t.Timestamp)
-                .ToListAsync();
-
-            var totalCredits = transactions
-                .Where(t => t.Type == TransactionType.Deposit || t.Type == TransactionType.TransferIn)
-                .Sum(t => t.Amount);
-
-            var totalDebits = transactions
-                .Where(t => t.Type == TransactionType.Withdraw || t.Type == TransactionType.TransferOut)
-                .Sum(t => t.Amount);
-
-            ViewBag.User = user;
-            ViewBag.Account = account;
-            ViewBag.FromDate = start;
-            ViewBag.ToDate = end;
-            ViewBag.TotalCredits = totalCredits;
-            ViewBag.TotalDebits = totalDebits;
-
-            return View(transactions);
-        }
-
-        // GET: Transaction/Receipt
-        [HttpGet]
-        public async Task<IActionResult> Receipt(int id, string? biller = null, string? billRef = null, string? category = null)
-        {
-            var userId = GetCurrentUserId();
-            var user = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Id == userId);
-
-            if (user == null || !user.Accounts.Any())
-            {
-                return RedirectToAction("Index", "Dashboard");
-            }
-
-            var account = user.Accounts.First();
-            var transaction = await _context.Transactions
-                .FirstOrDefaultAsync(t => t.Id == id && t.AccountId == account.Id);
-
-            if (transaction == null)
-            {
-                TempData["ErrorToast"] = "Transaction record not found.";
-                return RedirectToAction("History");
-            }
-
-            ViewBag.User = user;
-            ViewBag.Account = account;
-            ViewBag.Biller = biller;
-            ViewBag.BillRef = billRef;
-            ViewBag.Category = category;
-
-            return View(transaction);
+            return View(pendingTx);
         }
     }
 }

@@ -16,6 +16,7 @@ namespace SmartBank.Data
         public DbSet<LoanApplication> LoanApplications { get; set; } = null!;
         public DbSet<ExternalLogin> ExternalLogins { get; set; } = null!;
         public DbSet<OtpChallenge> OtpChallenges { get; set; } = null!;
+        public DbSet<PendingTransaction> PendingTransactions { get; set; } = null!;
         public DbSet<TransferRequest> TransferRequests { get; set; } = null!;
         public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
 
@@ -135,21 +136,50 @@ namespace SmartBank.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // PendingTransaction configuration
+            modelBuilder.Entity<PendingTransaction>(entity =>
+            {
+                entity.HasKey(pt => pt.Id);
+                entity.Property(pt => pt.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(pt => pt.TransactionType).IsRequired().HasMaxLength(50);
+                entity.Property(pt => pt.Status).IsRequired().HasMaxLength(50).HasDefaultValue("PendingOtp");
+
+                entity.HasIndex(pt => pt.UserId);
+                entity.HasIndex(pt => pt.Status);
+
+                entity.HasOne(pt => pt.User)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(pt => pt.Account)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.AccountId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             // OtpChallenge configuration
             modelBuilder.Entity<OtpChallenge>(entity =>
             {
                 entity.HasKey(o => o.Id);
-                entity.Property(o => o.Purpose).IsRequired().HasMaxLength(50);
-                entity.Property(o => o.ReferenceId).HasMaxLength(100);
-                entity.Property(o => o.CodeHash).IsRequired().HasMaxLength(256);
+                entity.Property(o => o.TransactionType).IsRequired().HasMaxLength(50);
+                entity.Property(o => o.HashedOtp).IsRequired().HasMaxLength(256);
+                entity.Property(o => o.TransactionAmount).HasColumnType("decimal(18,2)");
+                entity.Property(o => o.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Pending");
 
                 // Indexes
-                entity.HasIndex(o => new { o.UserId, o.Purpose, o.ReferenceId });
+                entity.HasIndex(o => new { o.UserId, o.TransactionType, o.TransactionId });
+                entity.HasIndex(o => o.ExpiresAt);
 
                 // Relationship
                 entity.HasOne(o => o.User)
                     .WithMany(u => u.OtpChallenges)
                     .HasForeignKey(o => o.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(o => o.PendingTransaction)
+                    .WithMany()
+                    .HasForeignKey(o => o.TransactionId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -180,11 +210,6 @@ namespace SmartBank.Data
                     .WithMany()
                     .HasForeignKey(tr => tr.DestinationAccountId)
                     .OnDelete(DeleteBehavior.Restrict);
-
-                entity.HasOne(tr => tr.OtpChallenge)
-                    .WithMany()
-                    .HasForeignKey(tr => tr.OtpChallengeId)
-                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // OtpVerification configuration

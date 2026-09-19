@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using SmartBank.Client.Exceptions;
 using SmartBank.Client.Models;
+using SmartBank.Client.Models.Common;
 using SmartBank.Client.Services;
-using SmartBank.DTOs.Common;
 
 namespace SmartBank.Client.Forms
 {

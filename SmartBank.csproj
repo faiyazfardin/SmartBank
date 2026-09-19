@@ -5,15 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-SmartBank-bbf2b0d5-8e09-4fe4-9ae5-1da6ac164312</UserSecretsId>
-    <DefaultItemExcludes>$(DefaultItemExcludes);SmartBank.Client\**;Areas\**;Data\Migrations\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);SmartBank.Client\**;SmartBank.Tests\**;Areas\**;Data\Migrations\**</DefaultItemExcludes>
     <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="SmartBank.Client\**;Areas\**;Data\Migrations\**" />
-    <Content Remove="SmartBank.Client\**;Areas\**;Data\Migrations\**" />
-    <EmbeddedResource Remove="SmartBank.Client\**;Areas\**;Data\Migrations\**" />
-    <None Remove="SmartBank.Client\**;Areas\**;Data\Migrations\**" />
+    <Compile Remove="SmartBank.Client\**;SmartBank.Tests\**;Areas\**;Data\Migrations\**" />
+    <Content Remove="SmartBank.Client\**;SmartBank.Tests\**;Areas\**;Data\Migrations\**" />
+    <EmbeddedResource Remove="SmartBank.Client\**;SmartBank.Tests\**;Areas\**;Data\Migrations\**" />
+    <None Remove="SmartBank.Client\**;SmartBank.Tests\**;Areas\**;Data\Migrations\**" />
   </ItemGroup>
 
   <ItemGroup>

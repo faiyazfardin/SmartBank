@@ -60,39 +60,77 @@ namespace SmartBank.Services
                         ⏰ This code is valid for <strong>5 minutes</strong> and can only be used once.
                     </p>
                 </div>
-                <p style=""color: #64748b; font-size: 12px; text-align: center; margin-top: 24px; line-height: 1.5;"">
-                    If you did not initiate this login request, please contact SmartBank fraud support immediately.
-                </p>
             </div>";
 
             await SendEmailInternalAsync(toEmail, subject, htmlBody);
         }
 
-        public Task SendEmailVerificationOtpAsync(string toEmail, string otpCode) => SendOtpAsync(toEmail, otpCode);
-
-        public async Task SendTransferOtpEmailAsync(string toEmail, string recipientAccountNumber, decimal amount, string otpCode)
+        public async Task SendEmailVerificationOtpAsync(string toEmail, string otpCode)
         {
             LatestSentOtps[toEmail.ToLowerInvariant()] = otpCode;
 
-            var subject = $"SmartBank — Transfer Authorization Code: {otpCode}";
+            var subject = $"SmartBank — Confirm Email Verification Code: {otpCode}";
             var htmlBody = $@"
             <div style=""font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 16px; padding: 32px; border: 1px solid #334155;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
-                    <h2 style=""color: #38bdf8; margin: 0; font-size: 24px;"">SmartBank Security</h2>
-                    <p style=""color: #94a3b8; font-size: 14px; margin-top: 4px;"">Mandatory Transfer Authorization</p>
+                    <h2 style=""color: #38bdf8; margin: 0; font-size: 24px;"">SmartBank Registration</h2>
+                    <p style=""color: #94a3b8; font-size: 14px; margin-top: 4px;"">Confirm Your Email Address</p>
+                </div>
+                <div style=""background: #1e293b; border-radius: 12px; padding: 24px; text-align: center; border: 1px solid #475569;"">
+                    <div style=""font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; background: #0f172a; padding: 14px 20px; border-radius: 8px; display: inline-block; font-family: monospace; border: 1px dashed #0284c7;"">
+                        {otpCode}
+                    </div>
+                </div>
+            </div>";
+
+            await SendEmailInternalAsync(toEmail, subject, htmlBody);
+        }
+
+        public async Task SendTransferOtpEmailAsync(string toEmail, string recipientAccountNumber, decimal amount, string otpCode)
+        {
+            await SendUniversalTransactionOtpAsync(toEmail, "Valued Customer", "Fund Transfer", amount, $"Account #{recipientAccountNumber}", null, otpCode);
+        }
+
+        public async Task SendUniversalTransactionOtpAsync(
+            string toEmail,
+            string userName,
+            string transactionType,
+            decimal amount,
+            string? targetInfo,
+            string? reference,
+            string otpCode)
+        {
+            LatestSentOtps[toEmail.ToLowerInvariant()] = otpCode;
+
+            var subject = $"SmartBank OTP — {transactionType} of {amount:N2} BDT";
+            var targetDisplay = string.IsNullOrWhiteSpace(targetInfo) ? "" : $"<p><strong>Target:</strong> {targetInfo}</p>";
+            var refDisplay = string.IsNullOrWhiteSpace(reference) ? "" : $"<p><strong>Reference:</strong> {reference}</p>";
+
+            var htmlBody = $@"
+            <div style=""font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 16px; padding: 32px; border: 1px solid #334155;"">
+                <div style=""text-align: center; margin-bottom: 24px;"">
+                    <h2 style=""color: #38bdf8; margin: 0; font-size: 24px;"">SmartBank Security OTP</h2>
                 </div>
                 <div style=""background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #475569;"">
-                    <div style=""margin-bottom: 16px; color: #cbd5e1; font-size: 14px;"">
-                        <div><strong>Amount:</strong> <span style=""color: #34d399; font-size: 16px; font-weight: bold;"">${amount:N2}</span></div>
-                        <div style=""margin-top: 4px;""><strong>Recipient:</strong> <span style=""font-family: monospace; color: #38bdf8;"">{recipientAccountNumber}</span></div>
-                    </div>
+                    <p>Hello {userName},</p>
+                    <p>Your OTP for the following transaction is:</p>
+                    <ul style=""list-style: none; padding: 0; color: #cbd5e1; font-size: 14px;"">
+                        <li><strong>Transaction Type:</strong> {transactionType}</li>
+                        <li><strong>Amount:</strong> ৳{amount:N2} BDT</li>
+                        {(string.IsNullOrWhiteSpace(targetInfo) ? "" : $"<li><strong>Target:</strong> {targetInfo}</li>")}
+                        {(string.IsNullOrWhiteSpace(reference) ? "" : $"<li><strong>Reference:</strong> {reference}</li>")}
+                    </ul>
                     <div style=""text-align: center; margin: 20px 0;"">
                         <div style=""font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; background: #0f172a; padding: 14px 20px; border-radius: 8px; display: inline-block; font-family: monospace; border: 1px dashed #0284c7;"">
-                            {otpCode}
+                            🔐 {otpCode}
                         </div>
                     </div>
-                    <p style=""color: #94a3b8; font-size: 12px; margin: 0; text-align: center;"">
-                        ⏰ Code expires in <strong>5 minutes</strong>. Never share this code with anyone.
+                    <p style=""color: #f87171; font-size: 12px; margin-top: 16px; text-align: center;"">
+                        ⏰ This OTP is valid for <strong>2 minutes</strong> (120 seconds) and can be used only once.<br/>
+                        Do not share this code with anyone.
+                    </p>
+                    <p style=""color: #94a3b8; font-size: 12px; margin-top: 12px; text-align: center;"">
+                        If you did not initiate this transaction, contact SmartBank Security support immediately.
                     </p>
                 </div>
             </div>";
@@ -102,15 +140,27 @@ namespace SmartBank.Services
 
         public async Task SendTransferConfirmationEmailAsync(string toEmail, string recipientAccountNumber, decimal amount, string transactionId)
         {
-            var subject = $"SmartBank — Transfer Successful: ${amount:N2}";
+            await SendUniversalTransactionConfirmationAsync(toEmail, "Valued Customer", "Fund Transfer", amount, transactionId, 0m);
+        }
+
+        public async Task SendUniversalTransactionConfirmationAsync(
+            string toEmail,
+            string userName,
+            string transactionType,
+            decimal amount,
+            string trackingId,
+            decimal newBalance)
+        {
+            var subject = $"SmartBank — {transactionType} Successful: ৳{amount:N2}";
             var htmlBody = $@"
             <div style=""font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #0f172a; color: #f8fafc; border-radius: 16px; padding: 32px; border: 1px solid #334155;"">
                 <div style=""text-align: center; margin-bottom: 24px;"">
-                    <h2 style=""color: #34d399; margin: 0; font-size: 24px;"">Transfer Completed</h2>
+                    <h2 style=""color: #34d399; margin: 0; font-size: 24px;"">{transactionType} Completed</h2>
                 </div>
                 <div style=""background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #475569;"">
-                    <p style=""color: #cbd5e1; font-size: 14px;"">Your transfer of <strong style=""color: #34d399;"">${amount:N2}</strong> to account <strong style=""color: #38bdf8; font-family: monospace;"">{recipientAccountNumber}</strong> was successfully processed.</p>
-                    <p style=""color: #94a3b8; font-size: 12px; margin-bottom: 0;"">Transaction ID: {transactionId}</p>
+                    <p style=""color: #cbd5e1; font-size: 14px;"">Your <strong>{transactionType}</strong> of <strong style=""color: #34d399;"">৳{amount:N2}</strong> was successfully processed.</p>
+                    <p style=""color: #cbd5e1; font-size: 14px;"">Updated Balance: <strong style=""color: #38bdf8;"">৳{newBalance:N2}</strong></p>
+                    <p style=""color: #94a3b8; font-size: 12px; margin-bottom: 0;"">Tracking ID: <strong>{trackingId}</strong></p>
                 </div>
             </div>";
 

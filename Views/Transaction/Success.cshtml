@@ -1,0 +1,47 @@
+@model SmartBank.Entities.PendingTransaction
+@{
+    ViewData["Title"] = "Transaction Successful — SmartBank";
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro mx-auto text-center" style="max-width: 520px; border-radius: 24px; padding: 2.5rem 2rem; background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+        
+        <!-- Animated Success Badge -->
+        <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3 mx-auto" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); width: 80px; height: 80px;">
+            <i class="bi bi-check-circle-fill text-success display-4"></i>
+        </div>
+
+        <h3 class="fw-bold text-white mb-1">Transaction Successful!</h3>
+        <p class="text-secondary small mb-4">Your @ViewBag.TransactionType has been processed securely.</p>
+
+        <!-- Transaction Details Banner -->
+        <div class="card border-0 rounded-3 p-4 text-start mb-4" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-20 pb-2 mb-2">
+                <span class="text-secondary small fw-semibold">Tracking ID</span>
+                <span class="fw-bold text-info font-monospace">@ViewBag.TrackingId</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-20 pb-2 mb-2">
+                <span class="text-secondary small fw-semibold">Transaction Type</span>
+                <span class="badge px-3 py-1-5 rounded-pill fw-bold" style="background: rgba(14, 165, 233, 0.25); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-size: 0.85rem;">@ViewBag.TransactionType</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-20 pb-2 mb-2">
+                <span class="text-secondary small fw-semibold">Amount</span>
+                <span class="fw-bold fs-5" style="color: #10b981;">৳@string.Format("{0:N2}", ViewBag.Amount)</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-20 pb-2 mb-2">
+                <span class="text-secondary small fw-semibold">Updated Account Balance</span>
+                <span class="fw-bold text-white fs-5">৳@string.Format("{0:N2}", ViewBag.NewBalance)</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-secondary small fw-semibold">Completed At</span>
+                <span class="text-secondary small font-monospace">@string.Format("{0:MMM dd, yyyy HH:mm:ss} UTC", ViewBag.CompletedAt)</span>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2">
+            <a href="@Url.Action("Index", "Dashboard")" class="btn btn-submit-otp btn-lg rounded-3 fw-bold shadow-sm py-3">
+                <i class="bi bi-speedometer2 me-2"></i> Return to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
