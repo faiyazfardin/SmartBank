@@ -1,0 +1,83 @@
+@model SmartBank.ViewModels.CompleteGoogleProfileViewModel
+@{
+    ViewData["Title"] = "Complete Profile — SmartBank";
+    var email = ViewBag.Email as string ?? Model?.Email;
+    var fullName = ViewBag.FullName as string ?? Model?.FullName;
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro" style="max-width: 520px; border-radius: 24px; padding: 2.5rem 2rem; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+        
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); width: 64px; height: 64px;">
+                <i class="bi bi-person-badge text-success fs-2"></i>
+            </div>
+            <h4 class="fw-bold text-white mb-1">Complete Your Banking Profile</h4>
+            <p class="text-secondary small mb-0">Google identity verified. Provide required banking regulatory information.</p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small rounded-3 mb-3 d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2 fs-6 flex-shrink-0"></i>
+                <div>@ViewBag.Error</div>
+            </div>
+        }
+
+        <form asp-action="CompleteGoogleProfile" method="post" id="completeProfileForm">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Full Name (Read-Only)</label>
+                <input type="text" class="form-control" value="@fullName" readonly style="background: rgba(255,255,255,0.05); color: #94a3b8;" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Verified Email (Read-Only)</label>
+                <input type="email" class="form-control font-monospace" value="@email" readonly style="background: rgba(255,255,255,0.05); color: #38bdf8;" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Desired Username *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-at text-info"></i></span>
+                    <input asp-for="Username" type="text" class="form-control" placeholder="john_doe" required autofocus />
+                </div>
+                <span asp-validation-for="Username" class="text-danger small mt-1 d-block"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Phone Number (11 Digits) *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone text-info"></i></span>
+                    <input asp-for="PhoneNumber" type="tel" inputmode="numeric" maxlength="11" pattern="^\d{11}$" class="form-control font-monospace" placeholder="01712345678" required />
+                </div>
+                <span asp-validation-for="PhoneNumber" class="text-danger small mt-1 d-block"></span>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">National ID (14–16 Digits) *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-card-heading text-warning"></i></span>
+                    <input asp-for="NidNumber" type="text" inputmode="numeric" maxlength="16" pattern="^\d{14,16}$" class="form-control font-monospace" placeholder="14, 15, or 16 digit NID" required />
+                </div>
+                <div class="form-text text-secondary small">Required for identity verification by SmartBank Compliance.</div>
+                <span asp-validation-for="NidNumber" class="text-danger small mt-1 d-block"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-glow mb-3 rounded-3">
+                Submit for Verification <i class="bi bi-check-circle ms-1"></i>
+            </button>
+        </form>
+
+        <div class="text-center pt-3 border-top border-secondary border-opacity-20">
+            <a asp-action="Login" class="text-secondary small text-decoration-none">
+                <i class="bi bi-x-circle me-1"></i> Cancel &amp; Return to Login
+            </a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -157,6 +157,24 @@ namespace SmartBank.Client.Forms
 
             pnlUserBadge.Controls.AddRange(new Control[] { lblUserAvatar, lblUserName, lblUserTier });
 
+            var btnManageLoans = new Button
+            {
+                Text = "💰 Manage Loans",
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(16, 185, 129),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(140, 42),
+                Location = new Point(775, 21),
+                Cursor = Cursors.Hand
+            };
+            btnManageLoans.FlatAppearance.BorderSize = 0;
+            btnManageLoans.Click += (s, e) =>
+            {
+                using var loanDialog = new AdminLoanReviewDialog();
+                loanDialog.ShowDialog(this);
+            };
+
             btnLogout = new Button
             {
                 Text = "Logout",
@@ -171,7 +189,7 @@ namespace SmartBank.Client.Forms
             btnLogout.FlatAppearance.BorderSize = 0;
             btnLogout.Click += BtnLogout_Click;
 
-            pnlHeader.Controls.AddRange(new Control[] { lblLogo, lblSubtitle, pnlUserBadge, btnLogout });
+            pnlHeader.Controls.AddRange(new Control[] { lblLogo, lblSubtitle, pnlUserBadge, btnManageLoans, btnLogout });
 
             // 2. INTERACTIVE METRICS CARDS
             var pnlMetrics = new Panel { Location = new Point(24, 100), Size = new Size(1012, 90), BackColor = Color.Transparent };

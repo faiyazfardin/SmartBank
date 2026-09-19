@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
 using SmartBank.Entities;
+using SmartBank.Services.Interfaces;
 
 namespace SmartBank.Controllers
 {
@@ -15,10 +16,12 @@ namespace SmartBank.Controllers
     public class TransactionController : Controller
     {
         private readonly SmartBankDbContext _context;
+        private readonly ITransferService _transferService;
 
-        public TransactionController(SmartBankDbContext context)
+        public TransactionController(SmartBankDbContext context, ITransferService transferService)
         {
             _context = context;
+            _transferService = transferService;
         }
 
         private int GetCurrentUserId()
@@ -169,119 +172,105 @@ namespace SmartBank.Controllers
         {
             var userId = GetCurrentUserId();
             var (account, error) = await CheckAccountAndSuspensionAsync(userId);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
             ViewBag.ErrorMessage = error;
+            ViewBag.IsEmailVerified = user?.IsEmailVerified ?? false;
+            ViewBag.UserEmail = user?.Email ?? "";
             return View(account);
         }
 
-        // POST: Transaction/Transfer
+        // POST: Transaction/Transfer -> Initiates Pending Transfer & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount, string? memo)
         {
-            if (string.IsNullOrWhiteSpace(recipientAccountNumber))
-            {
-                TempData["ErrorToast"] = "Recipient account number is required.";
-                return RedirectToAction("Transfer");
-            }
-
-            if (amount <= 0)
-            {
-                TempData["ErrorToast"] = "Transfer amount must be greater than ৳0.";
-                return RedirectToAction("Transfer");
-            }
-
             var userId = GetCurrentUserId();
-            var (senderAccount, senderError) = await CheckAccountAndSuspensionAsync(userId);
-            if (senderError != null || senderAccount == null)
+            var (statusCode, response) = await _transferService.InitiateTransferAsync(userId, recipientAccountNumber, amount, memo);
+
+            if (statusCode != 200 || response.Data == null)
             {
-                TempData["ErrorToast"] = senderError ?? "Sender account is unavailable.";
+                TempData["ErrorToast"] = response.Message ?? "Failed to initiate transfer.";
                 return RedirectToAction("Transfer");
             }
 
-            var recAccClean = recipientAccountNumber.Trim();
-            var recipientUser = await _context.Users
-                .Include(u => u.Accounts)
-                .FirstOrDefaultAsync(u => u.Accounts.Any(a => a.AccountNumber == recAccClean));
+            // Redirect to OTP verification screen
+            return RedirectToAction("VerifyTransferOtp", new { requestId = response.Data.TransferRequestId });
+        }
 
-            if (recipientUser == null)
+        // GET: Transaction/VerifyTransferOtp
+        [HttpGet]
+        public async Task<IActionResult> VerifyTransferOtp(int requestId)
+        {
+            var userId = GetCurrentUserId();
+            var pendingTransfer = await _transferService.GetPendingTransferAsync(userId, requestId);
+
+            if (pendingTransfer == null || pendingTransfer.Status != TransferRequestStatus.PendingOtp)
             {
-                TempData["ErrorToast"] = $"Recipient account '{recAccClean}' was not found in the SmartBank network.";
+                TempData["ErrorToast"] = "No pending transfer found for verification.";
                 return RedirectToAction("Transfer");
             }
 
-            var recipientAccount = recipientUser.Accounts.FirstOrDefault(a => a.AccountNumber == recAccClean);
-            if (recipientAccount == null)
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            ViewBag.MaskedEmail = user != null ? (user.Email.Length > 4 ? $"{user.Email[0]}***{user.Email[^1]}@{user.Email.Split('@')[1]}" : user.Email) : "your email";
+            ViewBag.RecipientAccount = pendingTransfer.DestinationAccount?.AccountNumber ?? "N/A";
+            ViewBag.Amount = pendingTransfer.Amount;
+            ViewBag.RequestId = requestId;
+            ViewBag.ExpiresAt = pendingTransfer.ExpiresAt;
+
+            return View(pendingTransfer);
+        }
+
+        // POST: Transaction/VerifyTransferOtp
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> VerifyTransferOtp(int requestId, string otp)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _transferService.VerifyAndCompleteTransferAsync(userId, requestId, otp);
+
+            if (statusCode != 200 || !response.Success)
             {
-                TempData["ErrorToast"] = "Recipient account record not found.";
-                return RedirectToAction("Transfer");
-            }
-
-            if (recipientAccount.Id == senderAccount.Id)
-            {
-                TempData["ErrorToast"] = "Self-transfers are not allowed. Please enter a different recipient account.";
-                return RedirectToAction("Transfer");
-            }
-
-            if (recipientUser.Status != null && recipientUser.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
-            {
-                TempData["ErrorToast"] = "Transfer failed: The recipient account is under administrative suspension.";
-                return RedirectToAction("Transfer");
-            }
-
-            if (!recipientAccount.IsActive)
-            {
-                TempData["ErrorToast"] = "Transfer failed: The recipient account is frozen and cannot receive incoming funds.";
-                return RedirectToAction("Transfer");
-            }
-
-            if (amount > senderAccount.Balance)
-            {
-                TempData["ErrorToast"] = $"Insufficient balance! You have ৳{senderAccount.Balance:N2} available.";
-                return RedirectToAction("Transfer");
-            }
-
-            using var dbTransaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                senderAccount.Balance -= amount;
-                senderAccount.UpdatedAt = DateTime.UtcNow;
-
-                recipientAccount.Balance += amount;
-                recipientAccount.UpdatedAt = DateTime.UtcNow;
-
-                var outTx = new Transaction
+                ViewBag.ErrorMessage = response.Message ?? "Invalid verification code.";
+                var pendingTransfer = await _transferService.GetPendingTransferAsync(userId, requestId);
+                if (pendingTransfer == null || pendingTransfer.Status != TransferRequestStatus.PendingOtp)
                 {
-                    AccountId = senderAccount.Id,
-                    Type = TransactionType.TransferOut,
-                    Amount = amount,
-                    Timestamp = DateTime.UtcNow,
-                    RelatedAccountId = recipientAccount.Id
-                };
+                    TempData["ErrorToast"] = response.Message ?? "Transfer failed.";
+                    return RedirectToAction("Transfer");
+                }
 
-                var inTx = new Transaction
-                {
-                    AccountId = recipientAccount.Id,
-                    Type = TransactionType.TransferIn,
-                    Amount = amount,
-                    Timestamp = DateTime.UtcNow,
-                    RelatedAccountId = senderAccount.Id
-                };
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                ViewBag.MaskedEmail = user != null ? (user.Email.Length > 4 ? $"{user.Email[0]}***{user.Email[^1]}@{user.Email.Split('@')[1]}" : user.Email) : "your email";
+                ViewBag.RecipientAccount = pendingTransfer.DestinationAccount?.AccountNumber ?? "N/A";
+                ViewBag.Amount = pendingTransfer.Amount;
+                ViewBag.RequestId = requestId;
+                ViewBag.ExpiresAt = pendingTransfer.ExpiresAt;
 
-                _context.Transactions.Add(outTx);
-                _context.Transactions.Add(inTx);
-
-                await _context.SaveChangesAsync();
-                await dbTransaction.CommitAsync();
-
-                TempData["SuccessToast"] = $"Successfully transferred ৳{amount:N2} to {recipientUser.FullName} ({recAccClean})!";
-                return RedirectToAction("Receipt", new { id = outTx.Id });
+                return View(pendingTransfer);
             }
-            catch (Exception ex)
+
+            TempData["SuccessToast"] = response.Message ?? "Transfer completed successfully!";
+            return RedirectToAction("Index", "Dashboard");
+        }
+
+        // POST: Transaction/ResendTransferOtp
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendTransferOtp(int requestId)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _transferService.ResendTransferOtpAsync(userId, requestId);
+
+            if (statusCode == 200)
             {
-                await dbTransaction.RollbackAsync();
-                TempData["ErrorToast"] = $"Transfer processing error: {ex.Message}";
-                return RedirectToAction("Transfer");
+                TempData["SuccessToast"] = response.Message ?? "A new verification code has been dispatched.";
             }
+            else
+            {
+                TempData["ErrorToast"] = response.Message ?? "Could not resend verification code.";
+            }
+
+            return RedirectToAction("VerifyTransferOtp", new { requestId });
         }
 
         // GET: Transaction/PayBill

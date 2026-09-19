@@ -1,0 +1,89 @@
+@model SmartBank.Entities.TransferRequest
+@{
+    ViewData["Title"] = "Verify Money Transfer — SmartBank";
+    var maskedEmail = ViewBag.MaskedEmail as string ?? "your verified email";
+    var recipientAccount = ViewBag.RecipientAccount as string ?? "N/A";
+    var amount = ViewBag.Amount != null ? (decimal)ViewBag.Amount : (Model?.Amount ?? 0.00m);
+    var requestId = ViewBag.RequestId != null ? (int)ViewBag.RequestId : (Model?.Id ?? 0);
+}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="sb-card p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <div class="stat-icon-wrapper stat-icon-warning mx-auto mb-3" style="width: 58px; height: 58px; font-size: 1.6rem;">
+                        <i class="bi bi-shield-lock-fill"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-1">Transfer Verification</h3>
+                    <p class="text-muted small mb-0">Mandatory Email OTP Verification for Fund Transfer</p>
+                </div>
+
+                @if (ViewBag.ErrorMessage != null)
+                {
+                    <div class="alert alert-danger d-flex align-items-center mb-4 rounded-3">
+                        <i class="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
+                        <div class="small fw-semibold">@ViewBag.ErrorMessage</div>
+                    </div>
+                }
+
+                @if (TempData["SuccessToast"] != null)
+                {
+                    <div class="alert alert-success d-flex align-items-center mb-4 rounded-3">
+                        <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                        <div class="small fw-semibold">@TempData["SuccessToast"]</div>
+                    </div>
+                }
+
+                <!-- Transfer Summary Card -->
+                <div class="p-3 bg-light rounded-3 border mb-4">
+                    <div class="row g-2 text-center text-md-start">
+                        <div class="col-6">
+                            <div class="small text-muted">Transfer Amount</div>
+                            <div class="fw-extrabold text-primary fs-5">৳@amount.ToString("N2")</div>
+                        </div>
+                        <div class="col-6 text-end">
+                            <div class="small text-muted">Recipient Account</div>
+                            <div class="fw-bold font-monospace text-dark">****@recipientAccount.Substring(Math.Max(0, recipientAccount.Length - 4))</div>
+                        </div>
+                    </div>
+                    <hr class="my-2" />
+                    <div class="d-flex justify-content-between align-items-center small">
+                        <span class="text-muted">Security Code Sent To:</span>
+                        <span class="fw-semibold text-dark font-monospace">@maskedEmail</span>
+                    </div>
+                </div>
+
+                <form asp-controller="Transaction" asp-action="VerifyTransferOtp" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="requestId" value="@requestId" />
+
+                    <div class="mb-4 text-center">
+                        <label class="form-label fw-semibold text-secondary small mb-2">Enter 6-Digit OTP Code *</label>
+                        <input type="text" name="otp" class="form-control text-center fs-3 fw-bold font-monospace letter-spacing-3 py-2" placeholder="••••••" maxlength="6" pattern="[0-9]{6}" required autofocus />
+                        <div class="form-text small text-muted mt-2">
+                            <i class="bi bi-clock-history text-warning me-1"></i> Code valid for 5 minutes. Funds will only move after successful verification.
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <a asp-controller="Transaction" asp-action="Transfer" class="btn btn-outline-secondary w-50 py-2 fw-semibold rounded-pill">
+                            Cancel Transfer
+                        </a>
+                        <button type="submit" class="btn btn-warning w-50 py-2 fw-bold text-dark rounded-pill shadow-sm">
+                            <i class="bi bi-shield-check me-1"></i> Verify & Execute
+                        </button>
+                    </div>
+                </form>
+
+                <form asp-controller="Transaction" asp-action="ResendTransferOtp" method="post" class="text-center">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="requestId" value="@requestId" />
+                    <button type="submit" id="btnResend" class="btn btn-link text-secondary text-decoration-none small">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Didn't get the code? Resend OTP
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

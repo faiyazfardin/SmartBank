@@ -1,0 +1,56 @@
+@{
+    ViewData["Title"] = "Link Google Account — SmartBank";
+    var email = ViewBag.Email as string ?? "";
+    var fullName = ViewBag.FullName as string ?? "";
+}
+
+<div class="auth-wrapper">
+    <div class="auth-card-pro">
+        <div class="text-center mb-4">
+            <div class="brand-icon-box mx-auto mb-3 shadow-glow" style="width: 52px; height: 52px; font-size: 1.5rem; background: rgba(66, 133, 244, 0.15); border-color: rgba(66, 133, 244, 0.4);">
+                <i class="bi bi-link-45deg text-info"></i>
+            </div>
+            <h3 class="fw-extrabold text-white mb-1">Link Google Account</h3>
+            <p class="text-secondary small mb-0">Confirm your SmartBank password to securely link your Google account</p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                <div class="small fw-semibold">@ViewBag.Error</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="p-3 rounded-3 mb-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="small text-secondary mb-1">Detected SmartBank Account</div>
+            <div class="fw-bold text-white fs-6"><i class="bi bi-envelope-check text-success me-2"></i>@email</div>
+            @if (!string.IsNullOrEmpty(fullName))
+            {
+                <div class="small text-muted mt-1"><i class="bi bi-person me-1"></i>Google Name: @fullName</div>
+            }
+        </div>
+
+        <form asp-controller="Account" asp-action="LinkGoogle" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Your SmartBank Password</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-key text-warning"></i></span>
+                    <input type="password" id="inputPassword" name="password" class="form-control" placeholder="Enter your SmartBank password" required autofocus />
+                </div>
+                <div class="form-text small text-secondary mt-1">To protect against unauthorized takeovers, enter your password to confirm linking.</div>
+            </div>
+
+            <button type="submit" class="btn-cta-primary w-100 py-2-5 fw-bold shadow-glow mb-3">
+                <i class="bi bi-shield-check me-2"></i> Confirm & Link Google Account
+            </button>
+
+            <a asp-controller="Account" asp-action="Login" class="btn btn-outline-secondary w-100 py-2 small">
+                Cancel
+            </a>
+        </form>
+    </div>
+</div>

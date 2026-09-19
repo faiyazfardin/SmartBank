@@ -31,6 +31,7 @@ namespace SmartBank.Client.Forms
         private Button btnTransfer = null!;
         private Button btnWithdraw = null!;
         private Button btnPayBill = null!;
+        private Button btnLoan = null!;
         private Button btnExportStatement = null!;
         private Button btnRefresh = null!;
         private Button btnLogout = null!;
@@ -314,13 +315,14 @@ namespace SmartBank.Client.Forms
                 BackColor = Color.Transparent
             };
 
-            btnDeposit = CreateToolbarButton("Deposit Funds", Color.FromArgb(16, 185, 129), new Point(0, 4), BtnDeposit_Click);
-            btnTransfer = CreateToolbarButton("Transfer Money", Color.FromArgb(37, 99, 235), new Point(208, 4), BtnTransfer_Click);
-            btnWithdraw = CreateToolbarButton("ATM Withdrawal", Color.FromArgb(245, 158, 11), new Point(416, 4), BtnWithdraw_Click);
-            btnPayBill = CreateToolbarButton("Pay Utility Bill", Color.FromArgb(139, 92, 246), new Point(624, 4), BtnPayBill_Click);
-            btnExportStatement = CreateToolbarButton("Bank Statement", Color.FromArgb(71, 85, 105), new Point(832, 4), BtnExportStatement_Click);
+            btnDeposit = CreateToolbarButton("Deposit Funds", Color.FromArgb(16, 185, 129), new Point(0, 4), new Size(165, 48), BtnDeposit_Click);
+            btnTransfer = CreateToolbarButton("Transfer Money", Color.FromArgb(37, 99, 235), new Point(173, 4), new Size(165, 48), BtnTransfer_Click);
+            btnWithdraw = CreateToolbarButton("ATM Withdraw", Color.FromArgb(245, 158, 11), new Point(346, 4), new Size(165, 48), BtnWithdraw_Click);
+            btnPayBill = CreateToolbarButton("Pay Utility Bill", Color.FromArgb(139, 92, 246), new Point(519, 4), new Size(165, 48), BtnPayBill_Click);
+            btnLoan = CreateToolbarButton("💰 Loan Service", Color.FromArgb(16, 185, 129), new Point(692, 4), new Size(165, 48), BtnLoan_Click);
+            btnExportStatement = CreateToolbarButton("Bank Statement", Color.FromArgb(71, 85, 105), new Point(865, 4), new Size(165, 48), BtnExportStatement_Click);
 
-            pnlActions.Controls.AddRange(new Control[] { btnDeposit, btnTransfer, btnWithdraw, btnPayBill, btnExportStatement });
+            pnlActions.Controls.AddRange(new Control[] { btnDeposit, btnTransfer, btnWithdraw, btnPayBill, btnLoan, btnExportStatement });
 
             // 4. TRANSACTION HISTORY SECTION
             var pnlHistoryHeader = new Panel
@@ -463,22 +465,28 @@ namespace SmartBank.Client.Forms
             g.DrawString("•••", fontVal, Brushes.White, 275, 158);
         }
 
-        private Button CreateToolbarButton(string text, Color color, Point location, EventHandler onClick)
+        private Button CreateToolbarButton(string text, Color color, Point location, Size size, EventHandler onClick)
         {
             var btn = new Button
             {
                 Text = text,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = color,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(198, 48),
+                Size = size,
                 Location = location,
                 Cursor = Cursors.Hand
             };
             btn.FlatAppearance.BorderSize = 0;
             btn.Click += onClick;
             return btn;
+        }
+
+        private void BtnLoan_Click(object? sender, EventArgs e)
+        {
+            using var loanForm = new LoanEligibilityForm();
+            loanForm.ShowDialog(this);
         }
 
         private void ToggleBalanceVisibility()
@@ -667,18 +675,45 @@ namespace SmartBank.Client.Forms
             {
                 try
                 {
-                    var res = await ApiClient.PostAsync<ApiResponse<decimal>>("transactions/transfer", new
+                    // Step 1: Initiate Transfer & Request Email OTP
+                    var initRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientInitiateTransferResult>>("transactions/transfer", new
                     {
                         recipientAccountNumber = dlg.RecipientAccount.Trim(),
-                        amount = dlg.TransferAmount
+                        amount = dlg.TransferAmount,
+                        memo = dlg.Note
                     });
 
-                    if (res != null && res.Success)
+                    if (initRes == null || !initRes.Success || initRes.Data == null)
                     {
-                        SessionManager.Instance.Balance = res.Data;
-                        UpdateBalanceDisplay();
-                        MessageBox.Show(res.Message, "Transfer Completed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
+                        MessageBox.Show(initRes?.Message ?? "Unable to initiate transfer.", "Transfer Initialization Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Step 2: Prompt Customer for Email OTP
+                    using var otpDlg = new TransferOtpDialog(
+                        initRes.Data.TransferRequestId,
+                        initRes.Data.Amount,
+                        initRes.Data.MaskedRecipient,
+                        initRes.Data.MaskedEmail);
+
+                    if (otpDlg.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(otpDlg.OtpCode))
+                    {
+                        // Step 3: Verify OTP & Atomically Execute Transfer
+                        var verifyRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientCompleteTransferResult>>(
+                            $"transfers/{initRes.Data.TransferRequestId}/verify-otp",
+                            new { otp = otpDlg.OtpCode.Trim() });
+
+                        if (verifyRes != null && verifyRes.Success && verifyRes.Data != null)
+                        {
+                            SessionManager.Instance.Balance = verifyRes.Data.SenderNewBalance;
+                            UpdateBalanceDisplay();
+                            MessageBox.Show(verifyRes.Message, "Transfer Completed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
+                        }
+                        else
+                        {
+                            MessageBox.Show(verifyRes?.Message ?? "Verification failed.", "Transfer Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
                     }
                 }
                 catch (ApiException ex)

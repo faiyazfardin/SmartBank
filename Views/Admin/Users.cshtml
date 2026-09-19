@@ -137,23 +137,23 @@
                                             @(p.FullName.Length > 0 ? p.FullName.Substring(0, 1).ToUpper() : "U")
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark">@p.FullName</div>
-                                            <div class="text-muted small font-monospace">@@@p.Username</div>
+                                            <div class="fw-bold text-white">@p.FullName</div>
+                                            <div class="text-secondary small font-monospace">@@@p.Username</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="small text-dark fw-semibold">@p.Email</div>
-                                    <div class="text-muted small">@(p.PhoneNumber ?? "—")</div>
+                                    <div class="small text-white fw-semibold">@p.Email</div>
+                                    <div class="text-secondary small">@(p.PhoneNumber ?? "—")</div>
                                 </td>
                                 <td>
-                                    <span class="badge rounded-pill px-3 py-1 font-monospace fw-bold shadow-sm" style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.45) !important; color: #fbbf24 !important; font-size: 0.85rem;">
+                                    <span class="badge rounded-pill px-3 py-1 font-monospace fw-bold shadow-sm" style="background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.5) !important; color: #fbbf24 !important; font-size: 0.85rem;">
                                         <i class="bi bi-card-heading me-1 text-warning"></i>@(p.NidNumber ?? "Not Provided")
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="small text-dark fw-semibold">@p.CreatedAt.ToString("MMM dd, yyyy")</div>
-                                    <div class="text-muted small">@p.CreatedAt.ToString("hh:mm tt") UTC</div>
+                                    <div class="small text-white fw-semibold">@p.CreatedAt.ToString("MMM dd, yyyy")</div>
+                                    <div class="text-secondary small">@p.CreatedAt.ToString("hh:mm tt") UTC</div>
                                 </td>
                                 <td class="text-end">
                                     <div class="d-inline-flex gap-2">
@@ -269,14 +269,14 @@
                                             @(u.FullName.Length > 0 ? u.FullName.Substring(0, 1).ToUpper() : "U")
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-dark">@u.FullName</div>
-                                            <div class="text-muted small font-monospace">@@@u.Username</div>
+                                            <div class="fw-bold text-white">@u.FullName</div>
+                                            <div class="text-secondary small font-monospace">@@@u.Username</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="small text-dark fw-semibold">@u.Email</div>
-                                    <div class="text-muted small">@(u.PhoneNumber ?? "—")</div>
+                                    <div class="small text-white fw-semibold">@u.Email</div>
+                                    <div class="text-secondary small">@(u.PhoneNumber ?? "—")</div>
                                 </td>
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(u.NidNumber))
@@ -287,7 +287,7 @@
                                     }
                                     else
                                     {
-                                        <span class="text-muted small font-monospace">—</span>
+                                        <span class="text-secondary small font-monospace">—</span>
                                     }
                                 </td>
                                 <td>
@@ -297,15 +297,15 @@
                                     }
                                     else
                                     {
-                                        <span class="badge rounded-pill px-3 py-1 bg-secondary bg-opacity-10 text-secondary border font-semibold small">Customer</span>
+                                        <span class="badge rounded-pill px-3 py-1 bg-secondary bg-opacity-20 text-light border border-secondary border-opacity-30 font-semibold small">Customer</span>
                                     }
                                 </td>
                                 <td>
                                     @if (acc != null)
                                     {
-                                        <div class="font-monospace fw-bold text-dark d-inline-flex align-items-center gap-1">
+                                        <div class="font-monospace fw-bold text-white d-inline-flex align-items-center gap-1">
                                             <span>@acc.AccountNumber</span>
-                                            <button type="button" class="btn btn-sm btn-link p-0 text-muted" onclick="copyToClipboard('@acc.AccountNumber', this)" title="Copy Account #">
+                                            <button type="button" class="btn btn-sm btn-link p-0 text-secondary hover-white" onclick="copyToClipboard('@acc.AccountNumber', this)" title="Copy Account #">
                                                 <i class="bi bi-copy"></i>
                                             </button>
                                         </div>
@@ -323,8 +323,8 @@
                                 <td>
                                     @if (isPending)
                                     {
-                                        <span class="badge rounded-pill px-3 py-1 text-dark fw-bold border" style="background: #fef3c7; border-color: #fde68a !important;">
-                                            <i class="bi bi-clock-history me-1 text-warning"></i> Pending
+                                        <span class="badge rounded-pill px-3 py-1-5 fw-bold shadow-sm d-inline-flex align-items-center gap-1" style="background: rgba(245, 158, 11, 0.22); border: 1px solid rgba(245, 158, 11, 0.55) !important; color: #fbbf24 !important; font-size: 0.82rem;">
+                                            <i class="bi bi-hourglass-split text-warning"></i> Pending
                                         </span>
                                     }
                                     else if (isRejected)

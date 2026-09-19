@@ -1,0 +1,130 @@
+@model SmartBank.DTOs.Loans.LoanApplicationDto
+@{
+    ViewData["Title"] = $"Loan Application {Model.ApplicationNumber}";
+    var isAdmin = User.IsInRole("Admin");
+}
+
+<div class="container py-4" style="max-width: 760px;">
+    <!-- Top Back Link -->
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <a asp-controller="@(isAdmin ? "Admin" : "Loan")" asp-action="@(isAdmin ? "Loans" : "MyApplications")" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+            <i class="bi bi-arrow-left me-1"></i> Back to @(isAdmin ? "Admin Loan Manager" : "My Applications")
+        </a>
+        <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i> Print Receipt
+        </button>
+    </div>
+
+    <!-- Official Loan Application Receipt Card -->
+    <div class="sb-card p-4 p-md-5 position-relative overflow-hidden">
+        <!-- Watermark / Status Badge -->
+        <div class="d-flex justify-content-between align-items-start pb-4 border-bottom mb-4">
+            <div>
+                <span class="fs-4 fw-bold text-white">Smart<span class="text-info">Bank</span></span>
+                <div class="small text-muted">Official Credit & Loan Application Summary</div>
+            </div>
+            <div class="text-end">
+                @if (Model.Status == "Approved")
+                {
+                    <span class="badge bg-success border border-success-subtle rounded-pill px-3 py-2 fs-6">
+                        <i class="bi bi-check-circle-fill me-1"></i> APPROVED
+                    </span>
+                }
+                else if (Model.Status == "Rejected")
+                {
+                    <span class="badge bg-danger border border-danger-subtle rounded-pill px-3 py-2 fs-6">
+                        <i class="bi bi-x-circle-fill me-1"></i> REJECTED
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-warning text-dark border border-warning rounded-pill px-3 py-2 fs-6">
+                        <i class="bi bi-hourglass-split me-1"></i> PENDING REVIEW
+                    </span>
+                }
+            </div>
+        </div>
+
+        <!-- Application Header Box -->
+        <div class="text-center my-3 pb-3 border-bottom">
+            <div class="text-muted small fw-semibold text-uppercase tracking-wider">REQUESTED FINANCING</div>
+            <div class="display-4 fw-extrabold text-success mt-1 mb-2">
+                ৳@Model.RequestedAmount.ToString("N2")
+            </div>
+            <div class="d-flex justify-content-center align-items-center gap-2">
+                <span class="badge bg-dark border font-monospace text-info px-3 py-1">@Model.ApplicationNumber</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1">@Model.LoanType Loan</span>
+            </div>
+        </div>
+
+        <!-- Key Information Grid -->
+        <div class="row g-3 py-3">
+            <div class="col-6">
+                <div class="text-muted small">Applicant Name</div>
+                <div class="fw-bold text-white">@Model.CustomerName</div>
+            </div>
+            <div class="col-6 text-end">
+                <div class="text-muted small">Beneficiary Account</div>
+                <div class="fw-bold font-monospace text-info">@Model.AccountNumber</div>
+            </div>
+
+            <div class="col-6">
+                <div class="text-muted small">Applicant Contact</div>
+                <div class="text-light small">@Model.CustomerEmail <br />@Model.CustomerPhone</div>
+            </div>
+            <div class="col-6 text-end">
+                <div class="text-muted small">Application Date</div>
+                <div class="text-light small">@Model.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss") UTC</div>
+            </div>
+
+            <div class="col-6">
+                <div class="text-muted small">Eligibility Score</div>
+                <div class="fw-bold text-info">@Model.EligibilityScore / 100 (@Model.EligibilityCategory)</div>
+            </div>
+            <div class="col-6 text-end">
+                <div class="text-muted small">Eligible Credit Cap</div>
+                <div class="fw-bold text-success">৳@Model.EligibleAmount.ToString("N2")</div>
+            </div>
+
+            @if (Model.MonthlyIncome.HasValue)
+            {
+                <div class="col-12">
+                    <div class="text-muted small">Declared Monthly Income</div>
+                    <div class="fw-bold text-white">৳@Model.MonthlyIncome.Value.ToString("N2")</div>
+                </div>
+            }
+
+            <div class="col-12">
+                <div class="text-muted small">Loan Purpose</div>
+                <div class="p-3 rounded-3 bg-dark border border-secondary text-light mt-1 small">
+                    @Model.Purpose
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Decision & Notes Block -->
+        @if (Model.ReviewedAt.HasValue || !string.IsNullOrWhiteSpace(Model.AdminNote))
+        {
+            <div class="mt-4 p-4 rounded-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <h6 class="fw-bold text-white mb-2 d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-check text-warning"></i> Bank Credit Review Decision
+                </h6>
+                <div class="small text-muted mb-2">
+                    Reviewed By: <span class="text-white fw-semibold">@(Model.ReviewedBy ?? "Bank Underwriting Team")</span> • 
+                    Date: <span class="text-white fw-semibold">@Model.ReviewedAt?.ToString("MMM dd, yyyy HH:mm") UTC</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.AdminNote))
+                {
+                    <div class="p-2 rounded bg-dark border border-secondary text-light small fst-italic">
+                        "@Model.AdminNote"
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Simulation Note -->
+        <div class="mt-4 pt-3 border-top text-center text-muted small" style="font-size: 0.72rem;">
+            SmartBank Simulation Lending Engine &bull; Transaction Timestamp: @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") UTC &bull; ACID Ledger Secured
+        </div>
+    </div>
+</div>

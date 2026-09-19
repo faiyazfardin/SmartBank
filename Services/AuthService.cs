@@ -19,6 +19,8 @@ namespace SmartBank.Services
         private readonly IJwtService _jwtService;
         private readonly IRateLimitService _rateLimitService;
         private readonly IRefreshTokenService _refreshTokenService;
+        private readonly IOtpService _otpService;
+        private readonly IEmailService _emailService;
         private readonly int _lockoutMinutes;
         private readonly int _maxFailedAttempts;
 
@@ -27,12 +29,16 @@ namespace SmartBank.Services
             IJwtService jwtService,
             IRateLimitService rateLimitService,
             IRefreshTokenService refreshTokenService,
+            IOtpService otpService,
+            IEmailService emailService,
             IConfiguration configuration)
         {
             _context = context;
             _jwtService = jwtService;
             _rateLimitService = rateLimitService;
             _refreshTokenService = refreshTokenService;
+            _otpService = otpService;
+            _emailService = emailService;
             _lockoutMinutes = int.TryParse(configuration["Security:LockoutMinutes"], out var lockout) ? lockout : 15;
             _maxFailedAttempts = int.TryParse(configuration["Security:MaxLoginAttempts"], out var maxAttempts) ? maxAttempts : 5;
         }
@@ -456,6 +462,401 @@ namespace SmartBank.Services
 
             await _context.SaveChangesAsync();
             return (200, ApiResponse<bool>.SuccessResponse(true, "Password changed successfully"));
+        }
+
+        public async Task<GoogleLoginResult> ProcessGoogleLoginAsync(string googleSubjectId, string email, string fullName, string? ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(googleSubjectId) || string.IsNullOrWhiteSpace(email))
+            {
+                return new GoogleLoginResult
+                {
+                    Status = GoogleAuthStatus.Failed,
+                    ErrorMessage = "Missing verified identity claims from Google."
+                };
+            }
+
+            var cleanSubject = googleSubjectId.Trim();
+            var cleanEmail = email.Trim().ToLowerInvariant();
+
+            // 1. Check if an ExternalLogin exists for this Google subject
+            var externalLogin = await _context.ExternalLogins
+                .Include(e => e.User)
+                    .ThenInclude(u => u.Accounts)
+                .FirstOrDefaultAsync(e => e.Provider == "Google" && e.ProviderUserId == cleanSubject);
+
+            if (externalLogin != null)
+            {
+                var user = externalLogin.User;
+                var now = DateTime.UtcNow;
+
+                if (user.Status != null && user.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new GoogleLoginResult
+                    {
+                        Status = GoogleAuthStatus.Pending,
+                        ErrorMessage = "Your account registration is currently pending administrator verification (NID Review). You will be able to log in once an Admin approves your request."
+                    };
+                }
+
+                if (user.Status != null && user.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new GoogleLoginResult
+                    {
+                        Status = GoogleAuthStatus.Suspended,
+                        ErrorMessage = "This account has been administratively suspended. Access is prohibited."
+                    };
+                }
+
+                // Update last login
+                externalLogin.LastLoginAt = now;
+                user.UpdatedAt = now;
+                await _context.SaveChangesAsync();
+
+                var primaryAccount = user.Accounts.FirstOrDefault();
+                var token = _jwtService.GenerateToken(user, primaryAccount?.AccountNumber);
+                var (rawRefreshToken, _) = await _refreshTokenService.GenerateRefreshTokenAsync(user.Id, ipAddress);
+
+                var loginResponse = new LoginResponse
+                {
+                    Token = token,
+                    RefreshToken = rawRefreshToken,
+                    UserId = user.Id,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Role = user.Role,
+                    Email = user.Email,
+                    PhoneNumber = user.PhoneNumber,
+                    CreatedAt = user.CreatedAt,
+                    AccountNumber = primaryAccount?.AccountNumber ?? string.Empty,
+                    Balance = primaryAccount?.Balance ?? 0.00m,
+                    ExpiresIn = _jwtService.GetExpiryMinutes() * 60
+                };
+
+                return new GoogleLoginResult
+                {
+                    Status = GoogleAuthStatus.Authenticated,
+                    LoginData = loginResponse
+                };
+            }
+
+            // 2. Not linked: Check if an existing SmartBank user has the same email
+            var existingUserWithEmail = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            if (existingUserWithEmail != null)
+            {
+                if (existingUserWithEmail.Status != null && existingUserWithEmail.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new GoogleLoginResult
+                    {
+                        Status = GoogleAuthStatus.Pending,
+                        ErrorMessage = $"Registration submitted successfully! Your account with NID: {existingUserWithEmail.NidNumber ?? "submitted"} is pending administrator verification. Once an Admin approves your account, you will be able to sign in."
+                    };
+                }
+
+                if (existingUserWithEmail.Status != null && existingUserWithEmail.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new GoogleLoginResult
+                    {
+                        Status = GoogleAuthStatus.Suspended,
+                        ErrorMessage = "This account has been administratively suspended. Access is prohibited."
+                    };
+                }
+
+                // REQUIRE EXPLICIT ACCOUNT LINKING TO PREVENT ACCOUNT TAKEOVER
+                return new GoogleLoginResult
+                {
+                    Status = GoogleAuthStatus.RequiresLinking,
+                    GoogleSubjectId = cleanSubject,
+                    Email = cleanEmail,
+                    FullName = fullName
+                };
+            }
+
+            // 3. New Google user -> Requires completing registration with required banking info
+            return new GoogleLoginResult
+            {
+                Status = GoogleAuthStatus.RequiresRegistration,
+                GoogleSubjectId = cleanSubject,
+                Email = cleanEmail,
+                FullName = fullName
+            };
+        }
+
+        public async Task<(int StatusCode, ApiResponse<LoginResponse> Response)> LinkGoogleAccountAsync(LinkGoogleRequest request, string? ipAddress)
+        {
+            var cleanEmail = request.Email.Trim().ToLowerInvariant();
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .Include(u => u.ExternalLogins)
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+
+            if (user == null)
+            {
+                return (404, ApiResponse<LoginResponse>.FailureResponse("No SmartBank account found with this email address."));
+            }
+
+            if (!PasswordHasher.VerifyPassword(request.Password, user.PasswordHash))
+            {
+                return (401, ApiResponse<LoginResponse>.FailureResponse("Incorrect SmartBank password. Unable to link Google account."));
+            }
+
+            if (user.Status != null && user.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                return (403, ApiResponse<LoginResponse>.FailureResponse("Your account registration is currently pending administrator verification (NID Review)."));
+            }
+
+            if (user.Status != null && user.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+            {
+                return (403, ApiResponse<LoginResponse>.FailureResponse("This account has been administratively suspended. Access is prohibited."));
+            }
+
+            // Check if already linked
+            var alreadyLinked = user.ExternalLogins.Any(e => e.Provider == "Google" && e.ProviderUserId == request.GoogleSubjectId);
+            if (!alreadyLinked)
+            {
+                var externalLogin = new ExternalLogin
+                {
+                    UserId = user.Id,
+                    Provider = "Google",
+                    ProviderUserId = request.GoogleSubjectId.Trim(),
+                    Email = cleanEmail,
+                    CreatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow
+                };
+
+                _context.ExternalLogins.Add(externalLogin);
+            }
+
+            user.IsEmailVerified = true;
+            user.EmailVerifiedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var primaryAccount = user.Accounts.FirstOrDefault();
+            var token = _jwtService.GenerateToken(user, primaryAccount?.AccountNumber);
+            var (rawRefreshToken, _) = await _refreshTokenService.GenerateRefreshTokenAsync(user.Id, ipAddress);
+
+            var loginResponse = new LoginResponse
+            {
+                Token = token,
+                RefreshToken = rawRefreshToken,
+                UserId = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Role = user.Role,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
+                AccountNumber = primaryAccount?.AccountNumber ?? string.Empty,
+                Balance = primaryAccount?.Balance ?? 0.00m,
+                ExpiresIn = _jwtService.GetExpiryMinutes() * 60
+            };
+
+            return (200, ApiResponse<LoginResponse>.SuccessResponse(loginResponse, "Google account successfully linked to your SmartBank profile!"));
+        }
+
+        public async Task<(int StatusCode, ApiResponse<RegisterResponse> Response)> CompleteGoogleRegistrationAsync(CompleteGoogleRegistrationRequest request, string? ipAddress)
+        {
+            var normalizedUsername = request.Username.Trim().ToLowerInvariant();
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+
+            // Check if user already registered and is Pending or Rejected
+            var emailUser = await _context.Users
+                .Include(u => u.Accounts)
+                .Include(u => u.ExternalLogins)
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+            if (emailUser != null)
+            {
+                if (emailUser.Status != null && emailUser.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (201, ApiResponse<RegisterResponse>.SuccessResponse(new RegisterResponse
+                    {
+                        UserId = emailUser.Id,
+                        Username = emailUser.Username,
+                        FullName = emailUser.FullName,
+                        Role = emailUser.Role
+                    }, $"Registration submitted successfully! Your account with NID: {emailUser.NidNumber ?? request.NidNumber.Trim()} is pending administrator verification. Once an Admin approves your account, you will be able to sign in."));
+                }
+                else if (emailUser.Status != null && emailUser.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+                {
+                    _context.ExternalLogins.RemoveRange(emailUser.ExternalLogins);
+                    _context.Accounts.RemoveRange(emailUser.Accounts);
+                    _context.Users.Remove(emailUser);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    return (409, ApiResponse<RegisterResponse>.FailureResponse("An account with this email address already exists. Please sign in or link your account instead."));
+                }
+            }
+
+            var usernameUser = await _context.Users
+                .Include(u => u.Accounts)
+                .Include(u => u.ExternalLogins)
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == normalizedUsername);
+
+            if (usernameUser != null)
+            {
+                if (usernameUser.Status != null && usernameUser.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (201, ApiResponse<RegisterResponse>.SuccessResponse(new RegisterResponse
+                    {
+                        UserId = usernameUser.Id,
+                        Username = usernameUser.Username,
+                        FullName = usernameUser.FullName,
+                        Role = usernameUser.Role
+                    }, $"Registration submitted successfully! Your account with NID: {usernameUser.NidNumber ?? request.NidNumber.Trim()} is pending administrator verification. Once an Admin approves your account, you will be able to sign in."));
+                }
+                else if (usernameUser.Status != null && usernameUser.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+                {
+                    _context.ExternalLogins.RemoveRange(usernameUser.ExternalLogins);
+                    _context.Accounts.RemoveRange(usernameUser.Accounts);
+                    _context.Users.Remove(usernameUser);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    return (409, ApiResponse<RegisterResponse>.FailureResponse("This username is already taken. Please choose another username."));
+                }
+            }
+
+            var accountNumber = await GenerateUnique12DigitAccountNumberAsync();
+            var rawPassword = !string.IsNullOrWhiteSpace(request.Password) ? request.Password : (Guid.NewGuid().ToString("N") + "!Aa1");
+            var passwordHash = PasswordHasher.HashPassword(rawPassword);
+
+            var now = DateTime.UtcNow;
+            var user = new User
+            {
+                FullName = request.FullName.Trim(),
+                Email = normalizedEmail,
+                PhoneNumber = request.PhoneNumber.Trim(),
+                NidNumber = request.NidNumber.Trim(),
+                Username = normalizedUsername,
+                PasswordHash = passwordHash,
+                Role = "Customer", // NEVER ALLOW ADMIN
+                Status = "Pending",
+                IsEmailVerified = true, // Verified by Google OAuth
+                EmailVerifiedAt = now,
+                FailedLoginCount = 0,
+                LockedUntil = null,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            var initialBalance = 2500.00m;
+            var account = new Account
+            {
+                AccountNumber = accountNumber,
+                Balance = initialBalance,
+                IsActive = false,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            user.Accounts.Add(account);
+
+            var externalLogin = new ExternalLogin
+            {
+                Provider = "Google",
+                ProviderUserId = request.GoogleSubjectId.Trim(),
+                Email = normalizedEmail,
+                CreatedAt = now,
+                LastLoginAt = now
+            };
+
+            user.ExternalLogins.Add(externalLogin);
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                if (initialBalance > 0)
+                {
+                    var welcomeTx = new Transaction
+                    {
+                        AccountId = account.Id,
+                        Type = TransactionType.Deposit,
+                        Amount = initialBalance,
+                        Timestamp = now
+                    };
+                    _context.Transactions.Add(welcomeTx);
+                    await _context.SaveChangesAsync();
+                }
+
+                var token = _jwtService.GenerateToken(user, accountNumber);
+                var (rawRefreshToken, _) = await _refreshTokenService.GenerateRefreshTokenAsync(user.Id, ipAddress);
+
+                await transaction.CommitAsync();
+
+                var responseData = new RegisterResponse
+                {
+                    Token = token,
+                    RefreshToken = rawRefreshToken,
+                    UserId = user.Id,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Role = user.Role,
+                    AccountNumber = accountNumber,
+                    Balance = account.Balance,
+                    ExpiresIn = _jwtService.GetExpiryMinutes() * 60
+                };
+
+                return (201, ApiResponse<RegisterResponse>.SuccessResponse(responseData, "Google registration completed successfully!"));
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return (500, ApiResponse<RegisterResponse>.FailureResponse("Failed to complete Google registration: " + ex.Message));
+            }
+        }
+
+        public async Task<(int StatusCode, ApiResponse<bool> Response)> SendEmailVerificationOtpAsync(int userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return (404, ApiResponse<bool>.FailureResponse("User not found"));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return (200, ApiResponse<bool>.SuccessResponse(true, "Your email is already verified."));
+            }
+
+            var (challenge, plainOtp) = await _otpService.CreateChallengeAsync(userId, "EmailVerification", userId.ToString(), expiryMinutes: 5);
+            await _emailService.SendEmailVerificationOtpAsync(user.Email, plainOtp);
+
+            return (200, ApiResponse<bool>.SuccessResponse(true, $"A 6-digit verification code has been dispatched to {user.Email}."));
+        }
+
+        public async Task<(int StatusCode, ApiResponse<bool> Response)> VerifyEmailOtpAsync(int userId, string otp)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return (404, ApiResponse<bool>.FailureResponse("User not found"));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return (200, ApiResponse<bool>.SuccessResponse(true, "Your email is already verified."));
+            }
+
+            var (isValid, errorMsg) = await _otpService.ValidateChallengeAsync(userId, "EmailVerification", userId.ToString(), otp);
+            if (!isValid)
+            {
+                return (400, ApiResponse<bool>.FailureResponse(errorMsg ?? "Invalid verification code."));
+            }
+
+            user.IsEmailVerified = true;
+            user.EmailVerifiedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return (200, ApiResponse<bool>.SuccessResponse(true, "Email verified successfully! You can now initiate fund transfers."));
         }
     }
 }

@@ -33,5 +33,6 @@ namespace SmartBank.Entities
 
         // Navigation properties
         public virtual ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
+        public virtual ICollection<LoanApplication> LoanApplications { get; set; } = new List<LoanApplication>();
     }
 }

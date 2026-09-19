@@ -1,0 +1,76 @@
+@{
+    ViewData["Title"] = "Complete Registration — SmartBank";
+    var email = ViewBag.Email as string ?? "";
+    var fullName = ViewBag.FullName as string ?? "";
+}
+
+<div class="auth-wrapper">
+    <div class="auth-card-pro">
+        <div class="text-center mb-4">
+            <div class="brand-icon-box mx-auto mb-3 shadow-glow" style="width: 52px; height: 52px; font-size: 1.5rem; background: rgba(66, 133, 244, 0.15); border-color: rgba(66, 133, 244, 0.4);">
+                <i class="bi bi-person-check-fill text-info"></i>
+            </div>
+            <h3 class="fw-extrabold text-white mb-1">Complete Registration</h3>
+            <p class="text-secondary small mb-0">Provide required banking information to finish opening your SmartBank account</p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                <div class="small fw-semibold">@ViewBag.Error</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="p-3 rounded-3 mb-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="small text-secondary">Verified Google Profile</div>
+                    <div class="fw-bold text-white"><i class="bi bi-google text-danger me-1"></i> @fullName</div>
+                    <div class="small text-info">@email</div>
+                </div>
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25">
+                    <i class="bi bi-check2-circle me-1"></i> Verified Email
+                </span>
+            </div>
+        </div>
+
+        <form asp-controller="Account" asp-action="CompleteGoogleRegistration" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Choose Username *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-person text-info"></i></span>
+                    <input type="text" name="username" class="form-control" placeholder="e.g. john_doe" required autofocus />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Phone Number *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone text-primary"></i></span>
+                    <input type="tel" name="phoneNumber" class="form-control" placeholder="+880 1711-XXXXXX" required />
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">National ID (NID) Number *</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-card-heading text-warning"></i></span>
+                    <input type="text" name="nidNumber" class="form-control" placeholder="10 or 17 digit NID number" required />
+                </div>
+                <div class="form-text small text-secondary mt-1">Required for regulatory banking compliance & account opening.</div>
+            </div>
+
+            <button type="submit" class="btn-cta-primary w-100 py-2-5 fw-bold shadow-glow mb-3">
+                <i class="bi bi-check-circle-fill me-2"></i> Finish & Open Account
+            </button>
+
+            <a asp-controller="Account" asp-action="Login" class="btn btn-outline-secondary w-100 py-2 small">
+                Cancel
+            </a>
+        </form>
+    </div>
+</div>
