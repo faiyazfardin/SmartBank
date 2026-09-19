@@ -1,0 +1,571 @@
+@{
+    ViewData["Title"] = "Sign in with Google — SmartBank";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro" style="max-width: 480px; border-radius: 24px; padding: 2.5rem 2rem; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+        
+        <!-- Primary Form Submission (Hidden) -->
+        <form id="googleSubmitForm" asp-controller="Account" asp-action="DevGoogleCallback" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <input type="hidden" id="formEmail" name="email" value="" />
+            <input type="hidden" id="formFullName" name="fullName" value="" />
+            <input type="hidden" id="formGoogleSubjectId" name="googleSubjectId" value="" />
+        </form>
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: GOOGLE ACCOUNT CHOOSER             -->
+        <!-- ========================================== -->
+        <div id="viewAccountChooser">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: white; width: 60px; height: 60px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                </div>
+                <h4 class="fw-bold text-white mb-1">Choose an account</h4>
+                <p class="text-secondary small mb-0">to continue to <strong class="text-info">SmartBank</strong></p>
+            </div>
+
+            @if (TempData["ErrorToast"] != null)
+            {
+                <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small rounded-3 mb-3 d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill me-2 fs-6"></i>
+                    <div>@TempData["ErrorToast"]</div>
+                </div>
+            }
+
+            <div id="accountAddSuccessAlert" class="alert alert-success bg-success bg-opacity-10 border border-success border-opacity-25 text-success small rounded-3 mb-3 d-none align-items-center">
+                <i class="bi bi-check-circle-fill me-2 fs-6"></i>
+                <div id="accountAddSuccessText">Google Account added successfully!</div>
+            </div>
+
+            <!-- Accounts List -->
+            <div id="accountListContainer" class="d-flex flex-column gap-2 mb-3">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Use Another Account Option -->
+            <button type="button" class="btn btn-outline-light w-100 p-3 rounded-3 d-flex align-items-center justify-content-between border border-secondary border-opacity-30 hover-glow mb-4" style="background: rgba(255, 255, 255, 0.02);" onclick="showEmailStep()">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center text-info shadow-sm" style="width: 42px; height: 42px; background: rgba(14, 165, 233, 0.15); border: 1px dashed rgba(14, 165, 233, 0.4);">
+                        <i class="bi bi-person-plus-fill fs-5"></i>
+                    </div>
+                    <div class="text-start">
+                        <div class="fw-bold text-white fs-6">Use another account</div>
+                        <div class="small text-secondary">Sign in with a new Google Account &amp; verify OTP</div>
+                    </div>
+                </div>
+                <i class="bi bi-chevron-right text-secondary fs-5"></i>
+            </button>
+
+            <!-- Bottom Back Link -->
+            <div class="text-center pt-3 border-top border-secondary border-opacity-20">
+                <a asp-controller="Account" asp-action="Login" class="text-secondary small text-decoration-none hover-white">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Standard Login
+                </a>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: GOOGLE SIGN-IN — EMAIL STEP        -->
+        <!-- ========================================== -->
+        <div id="viewEmailStep" style="display: none;">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: white; width: 60px; height: 60px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                </div>
+                <h4 class="fw-bold text-white mb-1">Sign in</h4>
+                <p class="text-secondary small mb-0">with your Google Account to continue to <strong class="text-info">SmartBank</strong></p>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Email or phone</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-envelope text-info"></i></span>
+                    <input type="email" id="inputGoogleEmail" class="form-control font-monospace" placeholder="example@gmail.com" autofocus onkeydown="if(event.key === 'Enter') goToPasswordStep();" />
+                </div>
+            </div>
+
+            <div class="p-3 rounded-3 mb-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
+                <p class="small text-secondary mb-0">
+                    <i class="bi bi-shield-lock-fill text-success me-1"></i> Security: A 6-digit Google 2-Step OTP will be dispatched to verify your ownership of this Gmail address.
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-2">
+                <button type="button" class="btn btn-outline-secondary px-3 py-2 small fw-semibold" onclick="showAccountChooser()">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </button>
+                <button type="button" class="btn btn-primary px-4 py-2 fw-bold shadow-glow" onclick="goToPasswordStep()">
+                    Next <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 3: GOOGLE SIGN-IN — PASSWORD STEP     -->
+        <!-- ========================================== -->
+        <div id="viewPasswordStep" style="display: none;">
+            <div class="text-center mb-3">
+                <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: white; width: 60px; height: 60px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                </div>
+                <h4 class="fw-bold text-white mb-1">Welcome</h4>
+
+                <!-- Google Account Pill Badge -->
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-1-5 rounded-pill border border-secondary border-opacity-30 mt-2 mb-3" style="background: rgba(255, 255, 255, 0.05); cursor: pointer;" onclick="showEmailStep()">
+                    <div id="pwdAvatarBadge" class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" style="width: 24px; height: 24px; font-size: 0.75rem; background: #6366F1;">
+                        G
+                    </div>
+                    <span id="pwdEmailDisplay" class="small text-light font-monospace">user@gmail.com</span>
+                    <i class="bi bi-chevron-down text-secondary small"></i>
+                </div>
+            </div>
+
+            <!-- Full Name Field -->
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Full Name</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-person text-info"></i></span>
+                    <input type="text" id="inputGoogleFullName" class="form-control" placeholder="e.g. John Doe" />
+                </div>
+            </div>
+
+            <!-- Password Field -->
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Enter your Google password</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-lock text-warning"></i></span>
+                    <input type="password" id="inputGooglePassword" class="form-control font-monospace" placeholder="••••••••••••" value="googlepass123" onkeydown="if(event.key === 'Enter') requestGoogleOtpAndProceed();" />
+                    <button type="button" class="btn btn-outline-secondary border-secondary border-opacity-25 text-secondary" onclick="togglePasswordVisibility()">
+                        <i id="pwdToggleIcon" class="bi bi-eye"></i>
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="checkShowPassword" onchange="togglePasswordVisibilityWithCheckbox(this)">
+                        <label class="form-check-label small text-secondary" for="checkShowPassword">
+                            Show password
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-2">
+                <button type="button" class="btn btn-outline-secondary px-3 py-2 small fw-semibold" onclick="showEmailStep()">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </button>
+                <button type="button" id="btnRequestOtp" class="btn btn-primary px-4 py-2 fw-bold shadow-glow" onclick="requestGoogleOtpAndProceed()">
+                    <span id="btnRequestOtpText">Next (Send OTP)</span>
+                    <span id="btnRequestOtpSpinner" class="spinner-border spinner-border-sm d-none ms-1" role="status"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 4: GOOGLE 2-STEP VERIFICATION (OTP)   -->
+        <!-- ========================================== -->
+        <div id="viewOtpStep" style="display: none;">
+            <div class="text-center mb-3">
+                <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: white; width: 60px; height: 60px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                </div>
+                <h4 class="fw-bold text-white mb-1">2-Step Verification</h4>
+                <p class="text-secondary small mb-0">To confirm ownership, enter the 6-digit verification code sent to <strong id="otpEmailTarget" class="text-info font-monospace">user@gmail.com</strong></p>
+            </div>
+
+            <!-- OTP Helper Box (for instant developer convenience) -->
+            <div id="otpLiveDisplayBox" class="p-3 rounded-3 mb-3 d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35);">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-envelope-check-fill text-success fs-5"></i>
+                    <div>
+                        <div class="small fw-semibold text-white">Verification Code Dispatched</div>
+                        <div class="small text-secondary">Test OTP: <strong id="otpCodePreview" class="text-success font-monospace fs-6">123456</strong></div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-success py-1 px-2 rounded-pill small fw-bold" onclick="autoFillOtp()">
+                    <i class="bi bi-clipboard-check me-1"></i> Auto Fill
+                </button>
+            </div>
+
+            <div id="otpErrorAlert" class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small rounded-3 mb-3 d-none align-items-center">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-6"></i>
+                <div id="otpErrorText">Invalid verification code.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small fw-semibold text-light opacity-90 mb-1">Enter 6-Digit Code</label>
+                <div class="input-group input-group-lg auth-input-group">
+                    <span class="input-group-text font-monospace text-secondary fw-bold">G -</span>
+                    <input type="text" id="inputGoogleOtp" class="form-control font-monospace text-center fs-3 fw-bold tracking-widest" placeholder="123456" maxlength="6" autofocus onkeydown="if(event.key === 'Enter') verifyGoogleOtpAndFinish();" />
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span id="resendCountdown" class="small text-secondary">Resend code in 45s</span>
+                    <a href="javascript:void(0)" id="btnResendOtp" class="small text-info text-decoration-none fw-semibold d-none" onclick="resendGoogleOtp()">Resend Code</a>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-2">
+                <button type="button" class="btn btn-outline-secondary px-3 py-2 small fw-semibold" onclick="showPasswordStep()">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </button>
+                <button type="button" id="btnVerifyOtp" class="btn btn-success px-4 py-2 fw-bold shadow-glow" onclick="verifyGoogleOtpAndFinish()">
+                    <span id="btnVerifyOtpText">Verify &amp; Add Account</span>
+                    <span id="btnVerifyOtpSpinner" class="spinner-border spinner-border-sm d-none ms-1" role="status"></span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const DEFAULT_ACCOUNTS = [
+        { email: 'raisulhasanratul007@gmail.com', name: 'Raisul Hasan Ratul', color: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }
+    ];
+
+    const GRADIENTS = [
+        'linear-gradient(135deg, #6366F1, #8B5CF6)',
+        'linear-gradient(135deg, #EC4899, #F43F5E)',
+        'linear-gradient(135deg, #10B981, #06B6D4)',
+        'linear-gradient(135deg, #F59E0B, #EA580C)',
+        'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+        'linear-gradient(135deg, #14B8A6, #0284C7)'
+    ];
+
+    let currentEmail = '';
+    let currentFullName = '';
+    let currentDispatchedOtp = '';
+    let resendTimerInterval = null;
+
+    function getSavedAccounts() {
+        try {
+            const raw = localStorage.getItem('smartbank_dev_google_accounts');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.warn('Failed to read saved google accounts', e);
+        }
+        return DEFAULT_ACCOUNTS;
+    }
+
+    function saveAccounts(accounts) {
+        try {
+            localStorage.setItem('smartbank_dev_google_accounts', JSON.stringify(accounts));
+        } catch (e) {
+            console.warn('Failed to save google accounts', e);
+        }
+    }
+
+    function renderAccountList() {
+        const accounts = getSavedAccounts();
+        const container = document.getElementById('accountListContainer');
+        container.innerHTML = '';
+
+        accounts.forEach((acc, idx) => {
+            const initial = (acc.name && acc.name.trim().length > 0) ? acc.name.trim()[0].toUpperCase() : acc.email[0].toUpperCase();
+            const gradient = acc.color || GRADIENTS[idx % GRADIENTS.length];
+
+            const item = document.createElement('div');
+            item.className = 'account-item d-flex align-items-center justify-content-between p-3 rounded-3 border border-secondary border-opacity-25 hover-glow position-relative';
+            item.style.background = 'rgba(255, 255, 255, 0.03)';
+            item.style.cursor = 'pointer';
+
+            item.innerHTML = `
+                <div class="d-flex align-items-center gap-3 flex-grow-1" onclick="selectAccount('${escapeHtml(acc.email)}', '${escapeHtml(acc.name || '')}')">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 44px; height: 44px; background: ${gradient}; font-size: 1.1rem;">
+                        ${initial}
+                    </div>
+                    <div class="text-truncate">
+                        <div class="fw-bold text-white fs-6 text-truncate">${escapeHtml(acc.name || acc.email.split('@@')[0])}</div>
+                        <div class="small text-secondary font-monospace text-truncate">${escapeHtml(acc.email)}</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    ${accounts.length > 1 ? `
+                        <button type="button" class="btn btn-link text-secondary p-1 hover-danger" title="Remove from list" onclick="removeAccount(event, '${escapeHtml(acc.email)}')">
+                            <i class="bi bi-x-circle fs-6"></i>
+                        </button>
+                    ` : ''}
+                    <i class="bi bi-chevron-right text-secondary fs-5" onclick="selectAccount('${escapeHtml(acc.email)}', '${escapeHtml(acc.name || '')}')"></i>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text.replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        });
+    }
+
+    function selectAccount(email, fullName) {
+        if (!email) return;
+        document.getElementById('formEmail').value = email.trim();
+        document.getElementById('formFullName').value = fullName ? fullName.trim() : email.split('@@')[0];
+        document.getElementById('formGoogleSubjectId').value = 'google-sub-' + Math.abs(hashCode(email.trim().toLowerCase()));
+        document.getElementById('googleSubmitForm').submit();
+    }
+
+    function showAccountChooser() {
+        document.getElementById('viewAccountChooser').style.display = 'block';
+        document.getElementById('viewEmailStep').style.display = 'none';
+        document.getElementById('viewPasswordStep').style.display = 'none';
+        document.getElementById('viewOtpStep').style.display = 'none';
+        renderAccountList();
+    }
+
+    function showEmailStep() {
+        document.getElementById('viewAccountChooser').style.display = 'none';
+        document.getElementById('viewEmailStep').style.display = 'block';
+        document.getElementById('viewPasswordStep').style.display = 'none';
+        document.getElementById('viewOtpStep').style.display = 'none';
+        const input = document.getElementById('inputGoogleEmail');
+        input.value = '';
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function showPasswordStep() {
+        document.getElementById('viewAccountChooser').style.display = 'none';
+        document.getElementById('viewEmailStep').style.display = 'none';
+        document.getElementById('viewPasswordStep').style.display = 'block';
+        document.getElementById('viewOtpStep').style.display = 'none';
+    }
+
+    function goToPasswordStep() {
+        const emailInput = document.getElementById('inputGoogleEmail');
+        const email = emailInput.value ? emailInput.value.trim().toLowerCase() : '';
+
+        if (!email || !email.includes('@@')) {
+            alert('Please enter a valid Google / Gmail address.');
+            emailInput.focus();
+            return;
+        }
+
+        currentEmail = email;
+        const namePart = email.split('@@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        currentFullName = namePart;
+
+        document.getElementById('inputGoogleFullName').value = currentFullName;
+        document.getElementById('pwdEmailDisplay').textContent = currentEmail;
+        document.getElementById('pwdAvatarBadge').textContent = currentEmail[0].toUpperCase();
+
+        showPasswordStep();
+
+        const pwdInput = document.getElementById('inputGooglePassword');
+        setTimeout(() => pwdInput.focus(), 100);
+    }
+
+    async function requestGoogleOtpAndProceed() {
+        const nameInput = document.getElementById('inputGoogleFullName');
+        const pwdInput = document.getElementById('inputGooglePassword');
+        const btnText = document.getElementById('btnRequestOtpText');
+        const btnSpinner = document.getElementById('btnRequestOtpSpinner');
+
+        currentFullName = nameInput.value && nameInput.value.trim().length > 0 ? nameInput.value.trim() : currentFullName;
+
+        if (!pwdInput.value) {
+            alert('Please enter your Google password.');
+            pwdInput.focus();
+            return;
+        }
+
+        btnText.textContent = 'Dispatching OTP...';
+        btnSpinner.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/Account/SendDevGoogleOtp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentEmail, fullName: currentFullName })
+            });
+            const data = await resp.json();
+
+            btnText.textContent = 'Next (Send OTP)';
+            btnSpinner.classList.add('d-none');
+
+            if (data.success) {
+                currentDispatchedOtp = data.otp;
+                document.getElementById('otpEmailTarget').textContent = currentEmail;
+                document.getElementById('otpCodePreview').textContent = data.otp || '******';
+                document.getElementById('inputGoogleOtp').value = '';
+
+                document.getElementById('viewAccountChooser').style.display = 'none';
+                document.getElementById('viewEmailStep').style.display = 'none';
+                document.getElementById('viewPasswordStep').style.display = 'none';
+                document.getElementById('viewOtpStep').style.display = 'block';
+
+                startResendCountdown();
+                setTimeout(() => document.getElementById('inputGoogleOtp').focus(), 100);
+            } else {
+                alert(data.message || 'Failed to dispatch verification code.');
+            }
+        } catch (e) {
+            btnText.textContent = 'Next (Send OTP)';
+            btnSpinner.classList.add('d-none');
+            alert('Connection issue. Please try again.');
+        }
+    }
+
+    async function verifyGoogleOtpAndFinish() {
+        const otpInput = document.getElementById('inputGoogleOtp');
+        const otp = otpInput.value ? otpInput.value.trim() : '';
+        const errorAlert = document.getElementById('otpErrorAlert');
+        const errorText = document.getElementById('otpErrorText');
+        const btnText = document.getElementById('btnVerifyOtpText');
+        const btnSpinner = document.getElementById('btnVerifyOtpSpinner');
+
+        if (!otp || otp.length < 6) {
+            errorAlert.classList.remove('d-none');
+            errorAlert.classList.add('d-flex');
+            errorText.textContent = 'Please enter the complete 6-digit verification code.';
+            otpInput.focus();
+            return;
+        }
+
+        btnText.textContent = 'Verifying...';
+        btnSpinner.classList.remove('d-none');
+
+        try {
+            const resp = await fetch('/Account/VerifyDevGoogleOtp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentEmail, otp: otp })
+            });
+            const data = await resp.json();
+
+            btnText.textContent = 'Verify & Add Account';
+            btnSpinner.classList.add('d-none');
+
+            if (data.success) {
+                errorAlert.classList.add('d-none');
+                errorAlert.classList.remove('d-flex');
+
+                // Save to device Google Accounts list
+                const accounts = getSavedAccounts();
+                const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === currentEmail.toLowerCase());
+                if (existingIdx >= 0) {
+                    accounts[existingIdx].name = currentFullName;
+                } else {
+                    const color = GRADIENTS[accounts.length % GRADIENTS.length];
+                    accounts.push({ email: currentEmail, name: currentFullName, color });
+                }
+                saveAccounts(accounts);
+
+                // Show Added notification & Proceed to SmartBank
+                selectAccount(currentEmail, currentFullName);
+            } else {
+                errorAlert.classList.remove('d-none');
+                errorAlert.classList.add('d-flex');
+                errorText.textContent = data.message || 'Invalid verification code.';
+            }
+        } catch (e) {
+            btnText.textContent = 'Verify & Add Account';
+            btnSpinner.classList.add('d-none');
+            alert('Failed to verify OTP.');
+        }
+    }
+
+    function autoFillOtp() {
+        if (currentDispatchedOtp) {
+            document.getElementById('inputGoogleOtp').value = currentDispatchedOtp;
+            verifyGoogleOtpAndFinish();
+        }
+    }
+
+    function startResendCountdown() {
+        if (resendTimerInterval) clearInterval(resendTimerInterval);
+        let seconds = 45;
+        const countdownSpan = document.getElementById('resendCountdown');
+        const resendBtn = document.getElementById('btnResendOtp');
+        countdownSpan.classList.remove('d-none');
+        resendBtn.classList.add('d-none');
+
+        resendTimerInterval = setInterval(() => {
+            seconds--;
+            countdownSpan.textContent = `Resend code in ${seconds}s`;
+            if (seconds <= 0) {
+                clearInterval(resendTimerInterval);
+                countdownSpan.classList.add('d-none');
+                resendBtn.classList.remove('d-none');
+            }
+        }, 1000);
+    }
+
+    function resendGoogleOtp() {
+        requestGoogleOtpAndProceed();
+    }
+
+    function togglePasswordVisibility() {
+        const input = document.getElementById('inputGooglePassword');
+        const icon = document.getElementById('pwdToggleIcon');
+        const checkbox = document.getElementById('checkShowPassword');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+            checkbox.checked = true;
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+            checkbox.checked = false;
+        }
+    }
+
+    function togglePasswordVisibilityWithCheckbox(checkbox) {
+        const input = document.getElementById('inputGooglePassword');
+        const icon = document.getElementById('pwdToggleIcon');
+        if (checkbox.checked) {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+
+    function removeAccount(event, email) {
+        event.stopPropagation();
+        const accounts = getSavedAccounts().filter(a => a.email.toLowerCase() !== email.toLowerCase());
+        saveAccounts(accounts.length > 0 ? accounts : DEFAULT_ACCOUNTS);
+        renderAccountList();
+    }
+
+    function hashCode(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = (hash << 5) - hash + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return hash;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        showAccountChooser();
+    });
+</script>
+

@@ -675,18 +675,45 @@ namespace SmartBank.Client.Forms
             {
                 try
                 {
-                    var res = await ApiClient.PostAsync<ApiResponse<decimal>>("transactions/transfer", new
+                    // Step 1: Initiate Transfer & Request Email OTP
+                    var initRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientInitiateTransferResult>>("transactions/transfer", new
                     {
                         recipientAccountNumber = dlg.RecipientAccount.Trim(),
-                        amount = dlg.TransferAmount
+                        amount = dlg.TransferAmount,
+                        memo = dlg.Note
                     });
 
-                    if (res != null && res.Success)
+                    if (initRes == null || !initRes.Success || initRes.Data == null)
                     {
-                        SessionManager.Instance.Balance = res.Data;
-                        UpdateBalanceDisplay();
-                        MessageBox.Show(res.Message, "Transfer Completed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
+                        MessageBox.Show(initRes?.Message ?? "Unable to initiate transfer.", "Transfer Initialization Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // Step 2: Prompt Customer for Email OTP
+                    using var otpDlg = new TransferOtpDialog(
+                        initRes.Data.TransferRequestId,
+                        initRes.Data.Amount,
+                        initRes.Data.MaskedRecipient,
+                        initRes.Data.MaskedEmail);
+
+                    if (otpDlg.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(otpDlg.OtpCode))
+                    {
+                        // Step 3: Verify OTP & Atomically Execute Transfer
+                        var verifyRes = await ApiClient.PostAsync<ApiResponse<SmartBank.Client.Models.Transactions.ClientCompleteTransferResult>>(
+                            $"transfers/{initRes.Data.TransferRequestId}/verify-otp",
+                            new { otp = otpDlg.OtpCode.Trim() });
+
+                        if (verifyRes != null && verifyRes.Success && verifyRes.Data != null)
+                        {
+                            SessionManager.Instance.Balance = verifyRes.Data.SenderNewBalance;
+                            UpdateBalanceDisplay();
+                            MessageBox.Show(verifyRes.Message, "Transfer Completed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            await RefreshBalanceAndHistoryAsync(isBackgroundPoll: false);
+                        }
+                        else
+                        {
+                            MessageBox.Show(verifyRes?.Message ?? "Verification failed.", "Transfer Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
                     }
                 }
                 catch (ApiException ex)

@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = "Security Verification — SmartBank";
+    var email = ViewBag.Email as string ?? "your email";
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro" style="max-width: 480px; border-radius: 24px; padding: 2.5rem 2rem; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+        
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle shadow-glow mb-3" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); width: 64px; height: 64px;">
+                <i class="bi bi-shield-lock text-info fs-2"></i>
+            </div>
+            <h4 class="fw-bold text-white mb-1">Enter Security Code</h4>
+            <p class="text-secondary small mb-0">We sent a 6-digit verification code to <br /><strong class="text-info font-monospace">@email</strong></p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger small rounded-3 mb-3 d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2 fs-6 flex-shrink-0"></i>
+                <div>@ViewBag.Error</div>
+            </div>
+        }
+
+        <div id="resendAlert" class="alert alert-success bg-success bg-opacity-10 border border-success border-opacity-25 text-success small rounded-3 mb-3 d-none align-items-center">
+            <i class="bi bi-check-circle-fill me-2 fs-6 flex-shrink-0"></i>
+            <div id="resendAlertText">New code sent!</div>
+        </div>
+
+        <form asp-action="VerifyOtp" method="post" id="otpForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="code" id="hiddenOtpCode" value="" />
+
+            <!-- 6 Individual OTP Boxes -->
+            <div class="d-flex justify-content-between gap-2 mb-4">
+                @for (int i = 0; i < 6; i++)
+                {
+                    <input type="text" 
+                           class="form-control text-center font-monospace fs-2 fw-bold otp-digit" 
+                           maxlength="1" 
+                           inputmode="numeric" 
+                           data-index="@i" 
+                           style="width: 54px; height: 62px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #38bdf8; border-radius: 12px;" />
+                }
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-glow mb-3 rounded-3" id="btnSubmitOtp">
+                Verify &amp; Continue <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+        </form>
+
+        <div class="d-flex justify-content-between align-items-center pt-2">
+            <span id="countdownText" class="small text-secondary">Resend code in <strong id="timerSec" class="text-white">60</strong>s</span>
+            <button type="button" id="btnResend" class="btn btn-link text-info text-decoration-none small fw-semibold p-0 d-none" onclick="triggerResend()">
+                Resend Code
+            </button>
+        </div>
+
+        <div class="text-center pt-4 mt-3 border-top border-secondary border-opacity-20">
+            <a asp-action="Login" class="text-secondary small text-decoration-none">
+                <i class="bi bi-arrow-left me-1"></i> Back to Login
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const inputs = document.querySelectorAll('.otp-digit');
+        const hiddenCode = document.getElementById('hiddenOtpCode');
+        const form = document.getElementById('otpForm');
+
+        if (inputs.length > 0) inputs[0].focus();
+
+        inputs.forEach((input, idx) => {
+            input.addEventListener('input', (e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                e.target.value = val ? val[0] : '';
+                if (val && idx < inputs.length - 1) {
+                    inputs[idx + 1].focus();
+                }
+                syncOtp();
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && idx > 0) {
+                    inputs[idx - 1].focus();
+                }
+            });
+
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                if (pasteData) {
+                    for (let i = 0; i < inputs.length; i++) {
+                        inputs[i].value = pasteData[i] || '';
+                    }
+                    syncOtp();
+                    if (pasteData.length >= 6) {
+                        form.submit();
+                    }
+                }
+            });
+        });
+
+        function syncOtp() {
+            let fullCode = '';
+            inputs.forEach(i => fullCode += i.value);
+            hiddenCode.value = fullCode;
+            if (fullCode.length === 6) {
+                form.submit();
+            }
+        }
+
+        // 60-Second Cooldown Timer
+        let seconds = 60;
+        const timerSpan = document.getElementById('timerSec');
+        const countdownText = document.getElementById('countdownText');
+        const resendBtn = document.getElementById('btnResend');
+
+        const interval = setInterval(() => {
+            seconds--;
+            if (timerSpan) timerSpan.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(interval);
+                if (countdownText) countdownText.classList.add('d-none');
+                if (resendBtn) resendBtn.classList.remove('d-none');
+            }
+        }, 1000);
+    });
+
+    async function triggerResend() {
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        const token = tokenInput ? tokenInput.value : '';
+        const resendAlert = document.getElementById('resendAlert');
+        const resendAlertText = document.getElementById('resendAlertText');
+
+        try {
+            const resp = await fetch('/Account/ResendOtp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                resendAlert.classList.remove('d-none');
+                resendAlert.classList.add('d-flex');
+                resendAlertText.textContent = data.message;
+            } else {
+                alert(data.message);
+            }
+        } catch (e) {
+            alert('Could not resend OTP. Please try again.');
+        }
+    }
+</script>

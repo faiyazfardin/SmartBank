@@ -1,3 +1,17 @@
+@{
+    var routeController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var routeAction = ViewContext.RouteData.Values["action"]?.ToString();
+    
+    var isRegistrationStage = string.Equals(routeController, "Account", StringComparison.OrdinalIgnoreCase) &&
+        (string.Equals(routeAction, "CompleteGoogleProfile", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(routeAction, "CompleteGoogleRegistration", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(routeAction, "VerifyOtp", StringComparison.OrdinalIgnoreCase));
+         
+    var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+    var isFullyAuthenticatedUser = User.Identity != null && User.Identity.IsAuthenticated && 
+                                   !isRegistrationStage && 
+                                   int.TryParse(userIdClaim, out var parseId) && parseId > 0;
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,12 +34,12 @@
     <header class="sticky-top">
         <nav class="navbar navbar-expand-lg navbar-dark glass-nav py-3">
             <div class="container">
-                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 text-white" href="@(User.IsInRole("Admin") ? Url.Action("Users", "Admin") : Url.Action("Index", "Home"))">
+                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 text-white" href="@(isFullyAuthenticatedUser && User.IsInRole("Admin") ? Url.Action("Users", "Admin") : Url.Action("Index", "Home"))">
                     <span class="brand-icon-box">
                         <i class="bi bi-bank fs-5"></i>
                     </span>
                     <span>Smart<span class="text-info">Bank</span></span>
-                    @if (User.IsInRole("Admin"))
+                    @if (isFullyAuthenticatedUser && User.IsInRole("Admin"))
                     {
                         <span class="badge bg-danger ms-1 text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 0.5px;">Admin Mode</span>
                     }
@@ -37,7 +51,7 @@
 
                 <div class="collapse navbar-collapse" id="navbarMain">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
-                        @if (User.IsInRole("Admin"))
+                        @if (isFullyAuthenticatedUser && User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-warning fw-bold d-flex align-items-center gap-1" asp-controller="Admin" asp-action="Users">
@@ -57,7 +71,7 @@
                                     <i class="bi bi-house-door me-1"></i> Home
                                 </a>
                             </li>
-                            @if (User.Identity != null && User.Identity.IsAuthenticated)
+                            @if (isFullyAuthenticatedUser)
                             {
                                 <li class="nav-item">
                                     <a class="nav-link text-white" asp-controller="Dashboard" asp-action="Index">

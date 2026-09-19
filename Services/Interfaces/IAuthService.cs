@@ -13,5 +13,14 @@ namespace SmartBank.Services.Interfaces
         Task<(int StatusCode, ApiResponse<LoginResponse> Response)> GetCurrentUserProfileAsync(int userId);
         Task<(int StatusCode, ApiResponse<LoginResponse> Response)> UpdateProfileAsync(int userId, UpdateProfileRequest request);
         Task<(int StatusCode, ApiResponse<bool> Response)> ChangePasswordAsync(int userId, ChangePasswordRequest request);
+
+        // Google & External OAuth
+        Task<GoogleLoginResult> ProcessGoogleLoginAsync(string googleSubjectId, string email, string fullName, string? ipAddress);
+        Task<(int StatusCode, ApiResponse<LoginResponse> Response)> LinkGoogleAccountAsync(LinkGoogleRequest request, string? ipAddress);
+        Task<(int StatusCode, ApiResponse<RegisterResponse> Response)> CompleteGoogleRegistrationAsync(CompleteGoogleRegistrationRequest request, string? ipAddress);
+
+        // Email Verification
+        Task<(int StatusCode, ApiResponse<bool> Response)> SendEmailVerificationOtpAsync(int userId);
+        Task<(int StatusCode, ApiResponse<bool> Response)> VerifyEmailOtpAsync(int userId, string otp);
     }
 }

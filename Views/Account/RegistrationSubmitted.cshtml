@@ -1,0 +1,32 @@
+@{
+    ViewData["Title"] = "Registration Submitted — SmartBank";
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro text-center" style="max-width: 520px; border-radius: 24px; padding: 3rem 2rem; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);">
+        
+        <div class="d-inline-flex align-items-center justify-content-center p-4 rounded-circle shadow-glow mb-4" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); width: 80px; height: 80px;">
+            <i class="bi bi-clock-history text-info fs-1"></i>
+        </div>
+
+        <h3 class="fw-bold text-white mb-2">Registration Submitted</h3>
+        
+        <p class="text-secondary leading-relaxed mb-4" style="font-size: 0.95rem;">
+            Your registration has been submitted. Our team will verify your NID within <strong>1–2 business days</strong>. Once approved, you will receive an email with your login credentials.
+        </p>
+
+        <div class="p-3 mb-4 rounded-3 text-start" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div class="d-flex align-items-start gap-2 text-warning small mb-1">
+                <i class="bi bi-shield-lock-fill me-1 mt-1"></i>
+                <span class="fw-semibold">Compliance Note</span>
+            </div>
+            <div class="text-secondary small">
+                Check your Gmail inbox for updates. Your system-generated password will be dispatched to your email immediately upon approval.
+            </div>
+        </div>
+
+        <a asp-controller="Account" asp-action="Login" class="btn btn-primary w-100 py-3 fw-bold rounded-pill shadow-glow">
+            Return to Login Page <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+    </div>
+</div>

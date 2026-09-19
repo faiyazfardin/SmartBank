@@ -1,9 +1,24 @@
 @using System.Security.Claims
 
+@{
+    var routeController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var routeAction = ViewContext.RouteData.Values["action"]?.ToString();
+    
+    var isRegistrationStage = string.Equals(routeController, "Account", StringComparison.OrdinalIgnoreCase) &&
+        (string.Equals(routeAction, "CompleteGoogleProfile", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(routeAction, "CompleteGoogleRegistration", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(routeAction, "VerifyOtp", StringComparison.OrdinalIgnoreCase));
+         
+    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+    var isFullyAuthenticatedUser = User.Identity != null && User.Identity.IsAuthenticated && 
+                                   !isRegistrationStage && 
+                                   int.TryParse(userIdClaim, out var parseId) && parseId > 0;
+}
+
 <div class="d-flex align-items-center gap-2">
-@if (User.Identity != null && User.Identity.IsAuthenticated)
+@if (isFullyAuthenticatedUser)
 {
-    var fullName = User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "User";
+    var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? "User";
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => s[0])).ToUpper();
     if (string.IsNullOrEmpty(initials)) { initials = "SB"; }
     var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Customer";
@@ -24,7 +39,7 @@
         <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-lg border-0 py-2" aria-labelledby="userMenuDropdown">
             <li class="px-3 py-2 border-bottom border-secondary mb-1">
                 <div class="small text-white-50">Signed in as</div>
-                <div class="fw-bold text-white small">@User.Identity.Name</div>
+                <div class="fw-bold text-white small">@(User.Identity?.Name ?? "User")</div>
                 <div class="badge @(role == "Admin" ? "bg-danger" : "bg-secondary") mt-1">@role Account</div>
             </li>
             @if (role == "Admin")
@@ -59,6 +74,10 @@
             </li>
         </ul>
     </div>
+}
+else if (isRegistrationStage)
+{
+    @* Registration/Profile completion stage: Keep navbar right clean *@
 }
 else
 {

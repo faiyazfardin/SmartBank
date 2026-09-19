@@ -14,6 +14,10 @@ namespace SmartBank.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
         public DbSet<LoanApplication> LoanApplications { get; set; } = null!;
+        public DbSet<ExternalLogin> ExternalLogins { get; set; } = null!;
+        public DbSet<OtpChallenge> OtpChallenges { get; set; } = null!;
+        public DbSet<TransferRequest> TransferRequests { get; set; } = null!;
+        public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +33,7 @@ namespace SmartBank.Data
                 entity.Property(u => u.PasswordHash).IsRequired();
                 entity.Property(u => u.Role).IsRequired().HasMaxLength(50).HasDefaultValue("Customer");
                 entity.Property(u => u.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Active");
+                entity.Property(u => u.IsEmailVerified).HasDefaultValue(false);
 
                 // Indexes and Uniqueness
                 entity.HasIndex(u => u.Username).IsUnique();
@@ -109,6 +114,97 @@ namespace SmartBank.Data
                     .WithMany(a => a.LoanApplications)
                     .HasForeignKey(l => l.AccountId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ExternalLogin configuration
+            modelBuilder.Entity<ExternalLogin>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.ProviderUserId).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
+
+                // Indexes
+                entity.HasIndex(e => new { e.Provider, e.ProviderUserId }).IsUnique();
+                entity.HasIndex(e => e.UserId);
+
+                // Relationship
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.ExternalLogins)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // OtpChallenge configuration
+            modelBuilder.Entity<OtpChallenge>(entity =>
+            {
+                entity.HasKey(o => o.Id);
+                entity.Property(o => o.Purpose).IsRequired().HasMaxLength(50);
+                entity.Property(o => o.ReferenceId).HasMaxLength(100);
+                entity.Property(o => o.CodeHash).IsRequired().HasMaxLength(256);
+
+                // Indexes
+                entity.HasIndex(o => new { o.UserId, o.Purpose, o.ReferenceId });
+
+                // Relationship
+                entity.HasOne(o => o.User)
+                    .WithMany(u => u.OtpChallenges)
+                    .HasForeignKey(o => o.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // TransferRequest configuration
+            modelBuilder.Entity<TransferRequest>(entity =>
+            {
+                entity.HasKey(tr => tr.Id);
+                entity.Property(tr => tr.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(tr => tr.Status).IsRequired().HasMaxLength(50).HasDefaultValue(TransferRequestStatus.PendingOtp);
+                entity.Property(tr => tr.Memo).HasMaxLength(200);
+
+                // Indexes
+                entity.HasIndex(tr => tr.UserId);
+                entity.HasIndex(tr => tr.Status);
+
+                // Relationships
+                entity.HasOne(tr => tr.User)
+                    .WithMany(u => u.TransferRequests)
+                    .HasForeignKey(tr => tr.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(tr => tr.SourceAccount)
+                    .WithMany()
+                    .HasForeignKey(tr => tr.SourceAccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(tr => tr.DestinationAccount)
+                    .WithMany()
+                    .HasForeignKey(tr => tr.DestinationAccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(tr => tr.OtpChallenge)
+                    .WithMany()
+                    .HasForeignKey(tr => tr.OtpChallengeId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // OtpVerification configuration
+            modelBuilder.Entity<OtpVerification>(entity =>
+            {
+                entity.HasKey(o => o.Id);
+                entity.Property(o => o.Email).IsRequired().HasMaxLength(255);
+                entity.Property(o => o.CodeHash).IsRequired().HasMaxLength(256);
+                entity.Property(o => o.Salt).IsRequired().HasMaxLength(64);
+                entity.Property(o => o.AttemptCount).HasDefaultValue(0);
+                entity.Property(o => o.IsUsed).HasDefaultValue(false);
+
+                // Indexes
+                entity.HasIndex(o => new { o.Email, o.IsUsed, o.ExpiresAtUtc });
+
+                // Relationships
+                entity.HasOne(o => o.User)
+                    .WithMany()
+                    .HasForeignKey(o => o.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

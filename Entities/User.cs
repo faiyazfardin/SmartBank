@@ -46,6 +46,14 @@ namespace SmartBank.Entities
 
         public DateTime? LockedUntil { get; set; }
 
+        public bool IsEmailVerified { get; set; } = false;
+
+        public DateTime? EmailVerifiedAt { get; set; }
+
+        public bool MustChangePasswordOnNextLogin { get; set; } = false;
+
+        public DateTime? TemporaryPasswordIssuedAtUtc { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -54,5 +62,8 @@ namespace SmartBank.Entities
         public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
         public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public virtual ICollection<LoanApplication> LoanApplications { get; set; } = new List<LoanApplication>();
+        public virtual ICollection<ExternalLogin> ExternalLogins { get; set; } = new List<ExternalLogin>();
+        public virtual ICollection<OtpChallenge> OtpChallenges { get; set; } = new List<OtpChallenge>();
+        public virtual ICollection<TransferRequest> TransferRequests { get; set; } = new List<TransferRequest>();
     }
 }

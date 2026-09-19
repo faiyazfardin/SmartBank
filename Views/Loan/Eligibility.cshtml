@@ -26,11 +26,19 @@
         <div class="row align-items-center g-4">
             <div class="col-lg-8">
                 <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="badge @(Model.Eligible ? "bg-success-subtle text-success border border-success-subtle" : "bg-warning-subtle text-warning border border-warning-subtle") rounded-pill px-3 py-1 fw-bold">
-                        <i class="bi @(Model.Eligible ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-1"></i>
-                        @(Model.Eligible ? "ELIGIBLE FOR LOAN" : Model.Category.ToUpper())
-                    </span>
-                    <span class="badge bg-dark border text-muted rounded-pill px-3 py-1">Rule-Based Assessment</span>
+                    @if (Model.Eligible)
+                    {
+                        <span class="badge rounded-pill px-3 py-1-5 fw-bold shadow-sm d-inline-flex align-items-center gap-1" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.6) !important; color: #34d399 !important; font-size: 0.85rem;">
+                            <i class="bi bi-check-circle-fill"></i> ELIGIBLE FOR LOAN
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge rounded-pill px-3 py-1-5 fw-bold shadow-sm d-inline-flex align-items-center gap-1" style="background: rgba(239, 68, 68, 0.22); border: 1px solid rgba(239, 68, 68, 0.6) !important; color: #f87171 !important; font-size: 0.85rem;">
+                            <i class="bi bi-exclamation-triangle-fill"></i> NOT ELIGIBLE — @Model.Category.ToUpper()
+                        </span>
+                    }
+                    <span class="badge rounded-pill px-3 py-1 border border-secondary border-opacity-30 text-secondary font-monospace small" style="background: rgba(255, 255, 255, 0.05);">Rule-Based Assessment</span>
                 </div>
 
                 <h2 class="fw-extrabold text-white mb-2">Smart Loan Eligibility</h2>
@@ -47,13 +55,13 @@
                     }
                     else if (hasPending)
                     {
-                        <a asp-controller="Loan" asp-action="MyApplications" class="btn btn-warning px-4 py-2 rounded-pill fw-bold">
+                        <a asp-controller="Loan" asp-action="MyApplications" class="btn btn-warning px-4 py-2 rounded-pill fw-bold text-dark">
                             <i class="bi bi-hourglass-split me-1"></i> View Pending Application
                         </a>
                     }
                     else
                     {
-                        <button class="btn btn-secondary px-4 py-2 rounded-pill fw-bold" disabled>
+                        <button class="btn btn-secondary px-4 py-2 rounded-pill fw-bold opacity-75" disabled>
                             <i class="bi bi-lock-fill me-1"></i> Application Locked
                         </button>
                     }
@@ -65,10 +73,10 @@
 
             <!-- Score Circular Gauge Widget -->
             <div class="col-lg-4 text-center">
-                <div class="p-4 rounded-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
-                    <div class="small text-muted fw-bold text-uppercase tracking-wider mb-2">Eligibility Score</div>
+                <div class="p-4 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12);">
+                    <div class="small text-secondary fw-bold text-uppercase tracking-wider mb-2">Eligibility Score</div>
                     <div class="display-3 fw-extrabold @(Model.Score >= 80 ? "text-success" : Model.Score >= 65 ? "text-info" : Model.Score >= 50 ? "text-warning" : "text-danger") mb-0">
-                        @Model.Score<span class="fs-4 text-muted">/100</span>
+                        @Model.Score<span class="fs-4 text-secondary">/100</span>
                     </div>
                     <div class="fw-bold fs-6 mt-1 text-white">
                         Category: <span class="@(Model.Score >= 65 ? "text-info" : "text-warning")">@Model.Category</span>
@@ -91,11 +99,11 @@
                     <i class="bi bi-bank"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">MAX ELIGIBLE AMOUNT</div>
+                    <div class="text-secondary small fw-semibold text-uppercase">MAX ELIGIBLE AMOUNT</div>
                     <div class="fs-3 fw-bold text-success mt-1">
                         ৳@Model.MaximumAmount.ToString("N2")
                     </div>
-                    <div class="small text-muted mt-1">System Limit: ৳500,000</div>
+                    <div class="small text-secondary mt-1">System Limit: ৳500,000</div>
                 </div>
             </div>
         </div>
@@ -107,11 +115,11 @@
                     <i class="bi bi-wallet2"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">AVG MONTHLY BALANCE</div>
+                    <div class="text-secondary small fw-semibold text-uppercase">AVG MONTHLY BALANCE</div>
                     <div class="fs-3 fw-bold text-white mt-1">
                         ৳@Model.AverageMonthlyBalance.ToString("N2")
                     </div>
-                    <div class="small text-muted mt-1">Current: ৳@(account?.Balance.ToString("N2") ?? "0.00")</div>
+                    <div class="small text-secondary mt-1">Current: ৳@(account?.Balance.ToString("N2") ?? "0.00")</div>
                 </div>
             </div>
         </div>
@@ -123,11 +131,11 @@
                     <i class="bi bi-calendar-check"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">ACCOUNT MATURITY</div>
+                    <div class="text-secondary small fw-semibold text-uppercase">ACCOUNT MATURITY</div>
                     <div class="fs-3 fw-bold text-info mt-1">
-                        @Model.AccountAgeMonths <span class="fs-6 fw-normal text-muted">Months</span>
+                        @Model.AccountAgeMonths <span class="fs-6 fw-normal text-secondary">Months</span>
                     </div>
-                    <div class="small text-muted mt-1">Transactions: @Model.TotalTransactions (Min 10)</div>
+                    <div class="small text-secondary mt-1">Transactions: @Model.TotalTransactions (Min 10)</div>
                 </div>
             </div>
         </div>
@@ -141,15 +149,23 @@
                 <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
                     <i class="bi bi-clipboard2-check text-primary"></i> Assessment Decision Factors
                 </h5>
-                <div class="d-flex flex-column gap-2">
+                <div class="d-flex flex-column gap-3">
                     @foreach (var reason in Model.Reasons)
                     {
                         var isPositive = reason.StartsWith("✓");
-                        <div class="p-3 rounded-3 d-flex align-items-center gap-3" style="background: @(isPositive ? "rgba(16, 185, 129, 0.08)" : "rgba(244, 63, 94, 0.08)"); border: 1px solid @(isPositive ? "rgba(16, 185, 129, 0.2)" : "rgba(244, 63, 94, 0.2)");">
-                            <i class="bi @(isPositive ? "bi-check-circle-fill text-success fs-5" : "bi-x-circle-fill text-danger fs-5")"></i>
-                            <span class="fs-6 @(isPositive ? "text-light" : "text-danger-emphasis")">
-                                @reason.Substring(1).Trim()
-                            </span>
+                        <div class="p-3 rounded-3 d-flex align-items-center gap-3 shadow-sm" 
+                             style="background: @(isPositive ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.15)"); border: 1px solid @(isPositive ? "rgba(16, 185, 129, 0.4)" : "rgba(239, 68, 68, 0.45)");">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 34px; height: 34px; background: @(isPositive ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.25)");">
+                                <i class="bi @(isPositive ? "bi-check-lg fw-bold" : "bi-x-lg fw-bold")" style="color: @(isPositive ? "#34d399" : "#f87171"); font-size: 1.1rem;"></i>
+                            </div>
+                            <div class="d-flex flex-column">
+                                <span class="fs-6 fw-bold text-white mb-0">
+                                    @reason.Substring(1).Trim()
+                                </span>
+                                <span class="small fw-semibold mt-0-5" style="color: @(isPositive ? "#34d399" : "#fca5a5");">
+                                    @(isPositive ? "Requirement Satisfied" : "Unfulfilled Requirement — Action Needed")
+                                </span>
+                            </div>
                         </div>
                     }
                 </div>
@@ -166,8 +182,8 @@
                     @foreach (var item in Model.ScoreBreakdown)
                     {
                         <div>
-                            <div class="d-flex justify-content-between text-muted small fw-semibold mb-1">
-                                <span>@item.Key</span>
+                            <div class="d-flex justify-content-between small fw-semibold mb-1">
+                                <span class="text-secondary">@item.Key</span>
                                 <span class="text-white fw-bold">@item.Value pts</span>
                             </div>
                             <div class="progress" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px;">
@@ -177,15 +193,16 @@
                     }
                 </div>
 
-                <div class="mt-4 p-3 rounded-3 bg-light border border-white-10">
+                <div class="mt-4 p-3 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
                     <div class="d-flex align-items-center gap-2 text-warning small fw-bold mb-1">
                         <i class="bi bi-info-circle"></i> Loan Policy Formula
                     </div>
-                    <p class="text-secondary mb-0" style="font-size: 0.78rem; line-height: 1.4;">
-                        Maximum Loan = <code>MIN(Avg Monthly Balance &times; 3, ৳500,000)</code>. Approval requires an active KYC account, minimum 6 months history, and score &ge; 65.
+                    <p class="text-light mb-0" style="font-size: 0.8rem; line-height: 1.5; opacity: 0.95;">
+                        Maximum Loan = <code class="text-info" style="background: rgba(14, 165, 233, 0.15); padding: 2px 6px; border-radius: 4px; font-weight: 600;">MIN(Avg Monthly Balance &times; 3, ৳500,000)</code>. Approval requires an active KYC account, minimum 6 months history, and score &ge; 65.
                     </p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+

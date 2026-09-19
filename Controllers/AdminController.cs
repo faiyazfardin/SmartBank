@@ -3,11 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartBank.Data;
+using SmartBank.DTOs.Loans;
 using SmartBank.Entities;
+using SmartBank.Helpers;
 using SmartBank.Security;
+using SmartBank.Services.Interfaces;
 
 using SmartBank.DTOs.Loans;
 using SmartBank.Services.Interfaces;
@@ -19,11 +24,19 @@ namespace SmartBank.Controllers
     {
         private readonly SmartBankDbContext _context;
         private readonly ILoanService _loanService;
+        private readonly IWelcomeEmailService _welcomeEmailService;
+        private readonly ILogger<AdminController> _logger;
 
-        public AdminController(SmartBankDbContext context, ILoanService loanService)
+        public AdminController(
+            SmartBankDbContext context,
+            ILoanService loanService,
+            IWelcomeEmailService welcomeEmailService,
+            ILogger<AdminController> logger)
         {
             _context = context;
             _loanService = loanService;
+            _welcomeEmailService = welcomeEmailService;
+            _logger = logger;
         }
 
         // GET: Admin/Users
@@ -105,7 +118,12 @@ namespace SmartBank.Controllers
             var user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == userId);
             if (user != null)
             {
+                var plainPassword = PasswordGeneratorHelper.GenerateSecurePassword(10);
+                user.PasswordHash = SmartBank.Security.PasswordHasher.HashPassword(plainPassword);
+
                 user.Status = "Active";
+                user.MustChangePasswordOnNextLogin = true;
+                user.TemporaryPasswordIssuedAtUtc = DateTime.UtcNow;
                 user.UpdatedAt = DateTime.UtcNow;
 
                 foreach (var acc in user.Accounts)
@@ -115,7 +133,18 @@ namespace SmartBank.Controllers
                 }
 
                 await _context.SaveChangesAsync();
-                TempData["SuccessToast"] = $"Account for {user.FullName} (@{user.Username}) with NID {user.NidNumber} has been APPROVED and activated!";
+
+                bool emailSent = await _welcomeEmailService.SendWelcomeEmailAsync(user.Email, user.FullName, user.Username, plainPassword);
+
+                if (emailSent)
+                {
+                    TempData["SuccessToast"] = $"User approved. Welcome email sent to {user.Email}.";
+                }
+                else
+                {
+                    _logger.LogWarning("[ADMIN APPROVAL] Failed to send welcome email to {Email}. Plain Password: {Password}", user.Email, plainPassword);
+                    TempData["ErrorToast"] = $"Email failed. Manually send this password: {plainPassword}";
+                }
             }
             else
             {
@@ -151,47 +180,74 @@ namespace SmartBank.Controllers
             return RedirectToAction("Users");
         }
 
+        // GET: Admin/DeleteUser (fallback for direct URL access)
+        [HttpGet]
+        public IActionResult DeleteUser()
+        {
+            return RedirectToAction("Users");
+        }
+
         // POST: Admin/DeleteUser
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteUser(int userId)
         {
-            var currentClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-            if (int.TryParse(currentClaim, out var currentAdminId) && currentAdminId == userId)
+            try
             {
-                TempData["ErrorToast"] = "Administrative safety lockout: You cannot delete your own active admin account.";
-                return RedirectToAction("Users");
-            }
+                var currentClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value;
+                if (int.TryParse(currentClaim, out var currentAdminId) && currentAdminId == userId)
+                {
+                    TempData["ErrorToast"] = "Administrative safety lockout: You cannot delete your own active admin account.";
+                    return RedirectToAction("Users");
+                }
 
-            var user = await _context.Users
-                .Include(u => u.Accounts)
-                .Include(u => u.RefreshTokens)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+                var user = await _context.Users
+                    .Include(u => u.Accounts)
+                    .FirstOrDefaultAsync(u => u.Id == userId);
 
-            if (user == null)
-            {
-                TempData["ErrorToast"] = "User not found.";
-                return RedirectToAction("Users");
-            }
+                if (user == null)
+                {
+                    TempData["ErrorToast"] = "User not found.";
+                    return RedirectToAction("Users");
+                }
 
-            var accountIds = user.Accounts.Select(a => a.Id).ToList();
+                var accountIds = user.Accounts.Select(a => a.Id).ToList();
 
-            if (accountIds.Any())
-            {
-                var relatedTx = await _context.Transactions
-                    .Where(t => accountIds.Contains(t.AccountId) || (t.RelatedAccountId.HasValue && accountIds.Contains(t.RelatedAccountId.Value)))
+                // 1. Delete TransferRequests referencing user or user's accounts (they have DeleteBehavior.Restrict)
+                var relatedTransferRequests = await _context.TransferRequests
+                    .Where(tr => tr.UserId == userId ||
+                                 accountIds.Contains(tr.SourceAccountId) ||
+                                 accountIds.Contains(tr.DestinationAccountId))
                     .ToListAsync();
-                _context.Transactions.RemoveRange(relatedTx);
+                if (relatedTransferRequests.Any())
+                {
+                    _context.TransferRequests.RemoveRange(relatedTransferRequests);
+                }
+
+                // 2. Delete OtpVerifications (by UserId or Email)
+                var cleanEmail = user.Email.Trim().ToLower();
+                var otps = await _context.OtpVerifications
+                    .Where(o => o.UserId == userId || o.Email.ToLower() == cleanEmail)
+                    .ToListAsync();
+                if (otps.Any())
+                {
+                    _context.OtpVerifications.RemoveRange(otps);
+                }
+
+                // 3. Remove User (EF Core & DB Cascade handles Accounts, RefreshTokens, ExternalLogins, OtpChallenges, LoanApplications, Transactions)
+                _context.Users.Remove(user);
+
+                await _context.SaveChangesAsync();
+
+                TempData["SuccessToast"] = $"User profile and account for {user.FullName} (@{user.Username}) have been permanently deleted.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while deleting user {UserId}", userId);
+                TempData["ErrorToast"] = $"Failed to delete user: {ex.Message}";
             }
 
-            _context.Accounts.RemoveRange(user.Accounts);
-            _context.RefreshTokens.RemoveRange(user.RefreshTokens);
-            _context.Users.Remove(user);
-
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessToast"] = $"User profile and account for {user.FullName} (@{user.Username}) have been permanently deleted.";
             return RedirectToAction("Users");
         }
 

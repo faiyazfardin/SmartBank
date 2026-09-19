@@ -9,19 +9,23 @@ using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
 using SmartBank.DTOs.Common;
 using SmartBank.Entities;
+using SmartBank.Services.Interfaces;
 
 namespace SmartBank.Controllers
 {
     [ApiController]
     [Route("api/transactions")]
+    [Route("api/transfers")]
     [Authorize]
     public class TransactionApiController : ControllerBase
     {
         private readonly SmartBankDbContext _context;
+        private readonly ITransferService _transferService;
 
-        public TransactionApiController(SmartBankDbContext context)
+        public TransactionApiController(SmartBankDbContext context, ITransferService transferService)
         {
             _context = context;
+            _transferService = transferService;
         }
 
         private int GetCurrentUserId()
@@ -35,10 +39,16 @@ namespace SmartBank.Controllers
             public decimal Amount { get; set; }
         }
 
-        public class TransferRequest
+        public class TransferApiRequest
         {
             public string RecipientAccountNumber { get; set; } = string.Empty;
             public decimal Amount { get; set; }
+            public string? Memo { get; set; }
+        }
+
+        public class VerifyTransferOtpApiRequest
+        {
+            public string Otp { get; set; } = string.Empty;
         }
 
         private async Task<(Account? Account, string? ErrorMessage)> CheckSuspensionAndAccountAsync(int userId)
@@ -146,93 +156,38 @@ namespace SmartBank.Controllers
             return Ok(ApiResponse<decimal>.SuccessResponse(account.Balance, $"Successfully withdrew {request.Amount:C}"));
         }
 
+        // POST: api/transactions/transfer or api/transfers -> Initiates pending transfer & dispatches email OTP
+        [HttpPost]
         [HttpPost("transfer")]
-        public async Task<IActionResult> Transfer([FromBody] TransferRequest request)
+        public async Task<IActionResult> Transfer([FromBody] TransferApiRequest request)
         {
-            if (request.Amount <= 0)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Transfer amount must be greater than zero"));
-            }
-
             var userId = GetCurrentUserId();
-            var (senderAccount, senderError) = await CheckSuspensionAndAccountAsync(userId);
-            if (senderError != null || senderAccount == null)
-            {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse(senderError ?? "Sender account unavailable"));
-            }
+            var (statusCode, response) = await _transferService.InitiateTransferAsync(
+                userId, request.RecipientAccountNumber, request.Amount, request.Memo);
 
-            var recipientUser = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Accounts.Any(a => a.AccountNumber == request.RecipientAccountNumber.Trim()));
-            if (recipientUser == null)
-            {
-                return NotFound(ApiResponse<decimal>.FailureResponse("Recipient account not found"));
-            }
+            return StatusCode(statusCode, response);
+        }
 
-            var recipientAccount = recipientUser.Accounts.FirstOrDefault(a => a.AccountNumber == request.RecipientAccountNumber.Trim());
-            if (recipientAccount == null)
-            {
-                return NotFound(ApiResponse<decimal>.FailureResponse("Recipient account not found"));
-            }
+        // POST: api/transfers/{id}/verify-otp or api/transactions/transfer/{id}/verify-otp
+        [HttpPost("{id}/verify-otp")]
+        [HttpPost("transfer/{id}/verify-otp")]
+        public async Task<IActionResult> VerifyTransferOtp(int id, [FromBody] VerifyTransferOtpApiRequest request)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _transferService.VerifyAndCompleteTransferAsync(userId, id, request.Otp);
 
-            if (recipientUser.Status != null && recipientUser.Status.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
-            {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse("Transfer declined: The recipient account is under administrative suspension."));
-            }
+            return StatusCode(statusCode, response);
+        }
 
-            if (!recipientAccount.IsActive)
-            {
-                return StatusCode(403, ApiResponse<decimal>.FailureResponse("Recipient account is frozen and cannot receive transfers"));
-            }
+        // POST: api/transfers/{id}/resend-otp or api/transactions/transfer/{id}/resend-otp
+        [HttpPost("{id}/resend-otp")]
+        [HttpPost("transfer/{id}/resend-otp")]
+        public async Task<IActionResult> ResendTransferOtp(int id)
+        {
+            var userId = GetCurrentUserId();
+            var (statusCode, response) = await _transferService.ResendTransferOtpAsync(userId, id);
 
-            if (recipientAccount.Id == senderAccount.Id)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("You cannot transfer money to your own account"));
-            }
-
-            if (request.Amount > senderAccount.Balance)
-            {
-                return BadRequest(ApiResponse<decimal>.FailureResponse("Insufficient funds"));
-            }
-
-            using var dbTransaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                senderAccount.Balance -= request.Amount;
-                senderAccount.UpdatedAt = DateTime.UtcNow;
-
-                recipientAccount.Balance += request.Amount;
-                recipientAccount.UpdatedAt = DateTime.UtcNow;
-
-                var outTx = new Transaction
-                {
-                    AccountId = senderAccount.Id,
-                    Type = TransactionType.TransferOut,
-                    Amount = request.Amount,
-                    Timestamp = DateTime.UtcNow,
-                    RelatedAccountId = recipientAccount.Id
-                };
-
-                var inTx = new Transaction
-                {
-                    AccountId = recipientAccount.Id,
-                    Type = TransactionType.TransferIn,
-                    Amount = request.Amount,
-                    Timestamp = DateTime.UtcNow,
-                    RelatedAccountId = senderAccount.Id
-                };
-
-                _context.Transactions.Add(outTx);
-                _context.Transactions.Add(inTx);
-
-                await _context.SaveChangesAsync();
-                await dbTransaction.CommitAsync();
-
-                return Ok(ApiResponse<decimal>.SuccessResponse(senderAccount.Balance, $"Successfully transferred {request.Amount:C} to account {request.RecipientAccountNumber}"));
-            }
-            catch (Exception ex)
-            {
-                await dbTransaction.RollbackAsync();
-                return StatusCode(500, ApiResponse<decimal>.FailureResponse("Transfer failed", ex.Message));
-            }
+            return StatusCode(statusCode, response);
         }
 
         public class PayBillRequest
