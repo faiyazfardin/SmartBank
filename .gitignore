@@ -488,3 +488,10 @@ $RECYCLE.BIN/
 # Local cache & temporary session data
 session.json
 *.session
+
+# Local secret configuration files (Do not push to GitHub)
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+.env
+.env.*
