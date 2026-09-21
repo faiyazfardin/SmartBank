@@ -63,6 +63,11 @@ namespace SmartBank.Controllers
             {
                 query = query.Where(u => u.Status == statusFilter);
             }
+            else
+            {
+                // Default view: Exclude Rejected registration requests from active directory
+                query = query.Where(u => u.Status != "Rejected");
+            }
 
             var users = await query
                 .OrderByDescending(u => u.CreatedAt)
@@ -246,6 +251,121 @@ namespace SmartBank.Controllers
             }
 
             return RedirectToAction("Users");
+        }
+
+        // POST: Admin/SuspendUser
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SuspendUser(int userId, string suspensionType)
+        {
+            var user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == userId);
+            if (user != null)
+            {
+                if (string.Equals(user.Status, "Suspended", StringComparison.OrdinalIgnoreCase))
+                {
+                    user.Status = "Active";
+                    user.LockedUntil = null;
+                    user.FailedLoginCount = 0;
+                    user.UpdatedAt = DateTime.UtcNow;
+
+                    foreach (var acc in user.Accounts)
+                    {
+                        acc.IsActive = true;
+                        acc.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                    TempData["SuccessToast"] = $"User {user.FullName} (@{user.Username}) has been Reactivated & Unlocked.";
+                }
+                else
+                {
+                    user.Status = "Suspended";
+                    if (suspensionType == "1Hour") user.LockedUntil = DateTime.UtcNow.AddHours(1);
+                    else if (suspensionType == "24Hours") user.LockedUntil = DateTime.UtcNow.AddHours(24);
+                    else if (suspensionType == "7Days") user.LockedUntil = DateTime.UtcNow.AddDays(7);
+                    else user.LockedUntil = DateTime.UtcNow.AddYears(100);
+
+                    user.UpdatedAt = DateTime.UtcNow;
+
+                    foreach (var acc in user.Accounts)
+                    {
+                        acc.IsActive = false;
+                        acc.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                    TempData["SuccessToast"] = $"User {user.FullName} (@{user.Username}) has been SUSPENDED ({suspensionType}). Login access revoked.";
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                TempData["ErrorToast"] = "User not found.";
+            }
+
+            return RedirectToAction("Users");
+        }
+
+        // GET: Admin/GetUserReport
+        [HttpGet]
+        public async Task<IActionResult> GetUserReport(int userId)
+        {
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            var account = user.Accounts.FirstOrDefault();
+            List<object> userTransactions = new();
+
+            if (account != null)
+            {
+                var transactions = await _context.Transactions
+                    .Where(t => t.AccountId == account.Id)
+                    .OrderByDescending(t => t.Timestamp)
+                    .ToListAsync();
+
+                userTransactions = transactions.Select(t => (object)new
+                {
+                    t.Id,
+                    TransactionId = $"TXN-{t.Id:D6}",
+                    TransactionType = t.Type.ToString(),
+                    t.Amount,
+                    BalanceAfterTransaction = account.Balance,
+                    Description = t.Type == TransactionType.Deposit ? "Account Cash Deposit" :
+                                  t.Type == TransactionType.Withdraw ? "Account Cash Withdrawal" :
+                                  t.Type == TransactionType.TransferOut ? $"Transfer to Account #{t.RelatedAccountId}" :
+                                  $"Transfer from Account #{t.RelatedAccountId}",
+                    Reference = t.RelatedAccountId.HasValue ? $"ACC-{t.RelatedAccountId}" : "Direct Bank Operation",
+                    Status = "Completed",
+                    Timestamp = t.Timestamp.ToString("MMM dd, yyyy hh:mm:ss tt")
+                }).ToList();
+            }
+
+            var isLocked = user.LockedUntil.HasValue && user.LockedUntil.Value > DateTime.UtcNow;
+
+            return Ok(new
+            {
+                userId = user.Id,
+                fullName = user.FullName,
+                username = user.Username,
+                email = user.Email,
+                phoneNumber = user.PhoneNumber ?? "Not Provided",
+                nidNumber = user.NidNumber ?? "Not Provided",
+                role = user.Role,
+                status = user.Status,
+                isLocked,
+                lockedUntil = user.LockedUntil?.ToString("MMM dd, yyyy hh:mm tt") ?? null,
+                accountOpeningDate = user.CreatedAt.ToString("MMM dd, yyyy hh:mm tt") + " UTC",
+                createdAtRaw = user.CreatedAt,
+                accountNumber = account?.AccountNumber ?? "N/A",
+                accountBalance = account?.Balance ?? 0m,
+                accountIsActive = account?.IsActive ?? false,
+                transactions = userTransactions
+            });
         }
 
         // POST: Admin/ToggleAccountStatus
@@ -522,6 +642,73 @@ namespace SmartBank.Controllers
 
             TempData["SuccessToast"] = $"User details for {user.FullName} (@{user.Username}) updated successfully.";
             return RedirectToAction("Users");
+        }
+
+        // POST: Admin/AdminDepositFunds
+        [HttpPost]
+        public async Task<IActionResult> AdminDepositFunds([FromBody] AdminDepositDto dto)
+        {
+            if (dto == null || dto.UserId <= 0 || dto.Amount <= 0)
+            {
+                return BadRequest(new { message = "Invalid deposit parameters. Amount must be greater than zero." });
+            }
+
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == dto.UserId);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "User record not found." });
+            }
+
+            var account = user.Accounts.FirstOrDefault();
+            if (account == null)
+            {
+                return BadRequest(new { message = "No active banking account found for this user." });
+            }
+
+            using var dbTx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                account.Balance += dto.Amount;
+                account.UpdatedAt = DateTime.UtcNow;
+
+                var txn = new Transaction
+                {
+                    AccountId = account.Id,
+                    Type = TransactionType.Deposit,
+                    Amount = dto.Amount,
+                    Timestamp = DateTime.UtcNow,
+                    RelatedAccountId = null
+                };
+
+                _context.Transactions.Add(txn);
+                await _context.SaveChangesAsync();
+                await dbTx.CommitAsync();
+
+                _logger.LogInformation("[ADMIN DEPOSIT SUCCESS] Admin deposited ৳{Amount:N2} to Account {AccountNum} (User #{UserId})", dto.Amount, account.AccountNumber, user.Id);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Successfully deposited ৳{dto.Amount:N2} to account {account.AccountNumber}.",
+                    newBalance = account.Balance
+                });
+            }
+            catch (Exception ex)
+            {
+                await dbTx.RollbackAsync();
+                _logger.LogError(ex, "Failed to execute Admin deposit for user {UserId}", dto.UserId);
+                return StatusCode(500, new { message = "Internal error executing deposit: " + ex.Message });
+            }
+        }
+
+        public class AdminDepositDto
+        {
+            public int UserId { get; set; }
+            public decimal Amount { get; set; }
+            public string? Reference { get; set; }
         }
 
         // GET: Admin/Loans

@@ -39,6 +39,16 @@ namespace SmartBank.Services
                 var fromEmail = smtpSection["FromEmail"] ?? smtpUser;
                 var fromName = smtpSection["FromName"] ?? "SmartBank Digital";
 
+                if (string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass) || smtpUser.StartsWith("YOUR_") || smtpPass.StartsWith("YOUR_"))
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[WELCOME EMAIL DEV MODE] Simulated email dispatch to: {toEmail} | Username: {username} | Temp Password: {plainPassword}");
+                    Console.ResetColor();
+
+                    _logger.LogInformation("[WELCOME EMAIL DEV MODE] Simulated login credentials email to {Email}", toEmail);
+                    return true;
+                }
+
                 var emailMessage = new MimeMessage();
                 emailMessage.From.Add(new MailboxAddress(fromName, fromEmail));
                 emailMessage.To.Add(new MailboxAddress(fullName, toEmail));

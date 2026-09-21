@@ -9,6 +9,77 @@
     decimal totalDebits = ViewBag.TotalDebits ?? 0m;
 }
 
+<style>
+    @@media print {
+        body {
+            background: #ffffff !important;
+            color: #000000 !important;
+        }
+        .no-print, header, footer, nav, .btn {
+            display: none !important;
+        }
+        .statement-paper {
+            background: #ffffff !important;
+            color: #000000 !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
+        .statement-paper * {
+            color: #000000 !important;
+            background: transparent !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: none !important;
+        }
+        .statement-paper .text-white, 
+        .statement-paper .text-muted, 
+        .statement-paper .text-secondary {
+            color: #1e293b !important;
+        }
+        .statement-paper .text-success {
+            color: #15803d !important;
+        }
+        .statement-paper .text-danger {
+            color: #b91c1c !important;
+        }
+        .statement-paper .text-info, 
+        .statement-paper .text-primary {
+            color: #0284c7 !important;
+        }
+        .statement-paper .badge {
+            border: 1px solid #94a3b8 !important;
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        .statement-paper .summary-box {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        .statement-paper table {
+            border: 1px solid #cbd5e1 !important;
+            width: 100% !important;
+        }
+        .statement-paper th, 
+        .statement-paper td {
+            border: 1px solid #cbd5e1 !important;
+            padding: 8px 10px !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+        }
+        .statement-paper thead th {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+            font-weight: 700 !important;
+        }
+        .statement-paper tfoot tr, 
+        .statement-paper tfoot td {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+            font-weight: 700 !important;
+        }
+    }
+</style>
+
 <div class="container py-4">
     <!-- Action controls (hidden when printing) -->
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
@@ -16,10 +87,10 @@
             <a asp-controller="Dashboard" asp-action="Index" class="btn btn-outline-secondary rounded-pill px-3">
                 <i class="bi bi-arrow-left me-1"></i> Dashboard
             </a>
-            <h4 class="fw-bold mb-0">Official Account Statement</h4>
+            <h4 class="fw-bold mb-0 text-white">Official Account Statement</h4>
         </div>
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-primary rounded-pill px-4" onclick="window.print()">
+            <button type="button" class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="window.print()">
                 <i class="bi bi-printer-fill me-1"></i> Print / Save as PDF
             </button>
         </div>
@@ -44,73 +115,86 @@
         </form>
     </div>
 
-    <!-- Printable Statement Paper -->
-    <div class="sb-card p-4 p-md-5 bg-white shadow-sm border">
+    <!-- Printable Statement Paper Container -->
+    <div class="sb-card p-4 p-md-5 statement-paper">
         <!-- Bank Formal Header -->
-        <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+        <div class="d-flex justify-content-between align-items-start border-bottom border-secondary-subtle pb-4 mb-4">
             <div>
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-3 p-2" style="font-size: 1.5rem;">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div class="brand-icon-box fs-4">
                         <i class="bi bi-bank"></i>
-                    </span>
-                    <h2 class="fw-bold text-dark mb-0">SmartBank <span class="text-primary fs-5">PLC</span></h2>
+                    </div>
+                    <div>
+                        <h2 class="fw-bold text-white mb-0">SmartBank <span class="text-primary fs-5 fw-semibold">PLC</span></h2>
+                        <div class="small text-muted">Core Ledger System &amp; Digital Banking</div>
+                    </div>
                 </div>
-                <div class="small text-muted">
-                    Head Office: 14/A Financial District, Gulshan Avenue, Dhaka-1212<br />
-                    SWIFT: SBNKBDDH | Web: www.smartbank.com | Email: support@smartbank.com
+                <div class="small text-muted mt-2">
+                    <i class="bi bi-geo-alt me-1"></i>Head Office: 14/A Financial District, Gulshan Avenue, Dhaka-1212<br />
+                    <i class="bi bi-shield-check me-1"></i>SWIFT: SBNKBDDH | Web: www.smartbank.com | Email: support@smartbank.com
                 </div>
             </div>
             <div class="text-end">
-                <span class="badge bg-dark text-white px-3 py-2 fs-6 mb-2">ACCOUNT STATEMENT</span>
-                <div class="small text-muted">Generated: <strong>@DateTime.UtcNow.ToString("MMM dd, yyyy HH:mm") UTC</strong></div>
+                <span class="badge bg-primary bg-gradient px-3 py-2 fs-6 mb-2 rounded-pill shadow-sm"><i class="bi bi-file-earmark-text me-1"></i> ACCOUNT STATEMENT</span>
+                <div class="small text-muted">Generated: <strong class="text-white">@DateTime.UtcNow.ToString("MMM dd, yyyy HH:mm") UTC</strong></div>
             </div>
         </div>
 
         <!-- Account Holder & Summary Grid -->
-        <div class="row g-4 mb-4 pb-4 border-bottom">
+        <div class="row g-4 mb-4 pb-4 border-bottom border-secondary-subtle">
             <div class="col-md-6">
-                <h6 class="fw-bold text-secondary text-uppercase small mb-2">Account Holder Details</h6>
-                <div class="fs-5 fw-bold text-dark">@user?.FullName</div>
-                <div class="text-muted small">Username: <span class="text-dark fw-semibold">@@@user?.Username</span></div>
-                <div class="text-muted small">Email: <span class="text-dark fw-semibold">@user?.Email</span></div>
-                <div class="text-muted small">Phone: <span class="text-dark fw-semibold">@(user?.PhoneNumber ?? "Not provided")</span></div>
+                <div class="summary-box p-3 rounded-3" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <h6 class="fw-bold text-uppercase small text-primary mb-3">
+                        <i class="bi bi-person-badge me-1"></i> Account Holder Details
+                    </h6>
+                    <div class="fs-5 fw-bold text-white mb-1">@user?.FullName</div>
+                    <div class="text-muted small mb-1"><i class="bi bi-at text-secondary me-1"></i>Username: <span class="text-white fw-semibold">@@@user?.Username</span></div>
+                    <div class="text-muted small mb-1"><i class="bi bi-envelope text-secondary me-1"></i>Email: <span class="text-white fw-semibold">@user?.Email</span></div>
+                    <div class="text-muted small"><i class="bi bi-telephone text-secondary me-1"></i>Phone: <span class="text-white fw-semibold">@(user?.PhoneNumber ?? "Not provided")</span></div>
+                </div>
             </div>
             <div class="col-md-6">
-                <h6 class="fw-bold text-secondary text-uppercase small mb-2">Statement Summary</h6>
-                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
-                    <span>Account Number:</span>
-                    <strong class="font-monospace text-dark">@(account?.AccountNumber ?? "N/A")</strong>
-                </div>
-                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
-                    <span>Statement Period:</span>
-                    <strong class="text-dark">@fromDate.ToString("MMM dd, yyyy") — @toDate.ToString("MMM dd, yyyy")</strong>
-                </div>
-                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
-                    <span>Total Inflow (Credits):</span>
-                    <strong class="text-success">+৳@totalCredits.ToString("N2")</strong>
-                </div>
-                <div class="d-flex justify-content-between text-muted small py-1 border-bottom">
-                    <span>Total Outflow (Debits):</span>
-                    <strong class="text-danger">-৳@totalDebits.ToString("N2")</strong>
-                </div>
-                <div class="d-flex justify-content-between text-muted small py-1">
-                    <span class="fw-bold text-dark">Current Balance:</span>
-                    <strong class="text-primary fs-6">৳@(account?.Balance.ToString("N2") ?? "0.00")</strong>
+                <div class="summary-box p-3 rounded-3" style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <h6 class="fw-bold text-uppercase small text-primary mb-3">
+                        <i class="bi bi-card-checklist me-1"></i> Statement Summary
+                    </h6>
+                    <div class="d-flex justify-content-between text-muted small py-1 border-bottom border-secondary-subtle">
+                        <span>Account Number:</span>
+                        <strong class="font-monospace text-white">@(account?.AccountNumber ?? "N/A")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted small py-1 border-bottom border-secondary-subtle">
+                        <span>Statement Period:</span>
+                        <strong class="text-white">@fromDate.ToString("MMM dd, yyyy") — @toDate.ToString("MMM dd, yyyy")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted small py-1 border-bottom border-secondary-subtle">
+                        <span>Total Inflow (Credits):</span>
+                        <strong class="text-success fw-bold">+৳@totalCredits.ToString("N2")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted small py-1 border-bottom border-secondary-subtle">
+                        <span>Total Outflow (Debits):</span>
+                        <strong class="text-danger fw-bold">-৳@totalDebits.ToString("N2")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted small pt-2">
+                        <span class="fw-bold text-white">Current Balance:</span>
+                        <strong class="text-info fs-6 fw-bold">৳@(account?.Balance.ToString("N2") ?? "0.00")</strong>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Statement Transactions Table -->
-        <h6 class="fw-bold text-secondary text-uppercase small mb-3">Itemized Transaction Record</h6>
-        <div class="table-responsive">
-            <table class="table table-bordered align-middle small mb-4">
-                <thead class="table-light">
+        <h6 class="fw-bold text-uppercase small text-primary mb-3">
+            <i class="bi bi-list-columns-reverse me-1"></i> Itemized Transaction Record
+        </h6>
+        <div class="table-responsive rounded-3 overflow-hidden border border-secondary-subtle mb-4">
+            <table class="table sb-table align-middle small mb-0">
+                <thead>
                     <tr>
-                        <th style="width: 15%;">Date & Time</th>
+                        <th style="width: 18%;">Date &amp; Time</th>
                         <th style="width: 20%;">Ref / Transaction ID</th>
-                        <th style="width: 25%;">Transaction Description</th>
-                        <th class="text-end" style="width: 20%;">Credit (Deposit/In)</th>
-                        <th class="text-end" style="width: 20%;">Debit (Withdraw/Out)</th>
+                        <th style="width: 26%;">Transaction Description</th>
+                        <th class="text-end" style="width: 18%;">Credit (Deposit/In)</th>
+                        <th class="text-end" style="width: 18%;">Debit (Withdraw/Out)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -120,20 +204,46 @@
                         {
                             var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
                             <tr>
-                                <td>@tx.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
-                                <td class="font-monospace">#TX-@tx.Id.ToString("D6")</td>
+                                <td class="text-nowrap text-white-50"><i class="bi bi-clock me-1 text-muted"></i>@tx.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td>
-                                    <strong>@tx.Type.ToString()</strong>
+                                    <span class="badge font-monospace px-2 py-1" style="background: rgba(255, 255, 255, 0.08); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">#TX-@tx.Id.ToString("D6")</span>
+                                </td>
+                                <td>
+                                    @if (tx.Type == SmartBank.Entities.TransactionType.Deposit)
+                                    {
+                                        <span class="badge-active me-1">
+                                            <i class="bi bi-arrow-down-left"></i> Deposit
+                                        </span>
+                                    }
+                                    else if (tx.Type == SmartBank.Entities.TransactionType.Withdraw)
+                                    {
+                                        <span class="badge-frozen me-1">
+                                            <i class="bi bi-arrow-up-right"></i> Withdraw
+                                        </span>
+                                    }
+                                    else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
+                                    {
+                                        <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill me-1">
+                                            <i class="bi bi-arrow-down-left"></i> Transfer In
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-suspended me-1">
+                                            <i class="bi bi-arrow-up-right"></i> Transfer Out
+                                        </span>
+                                    }
+
                                     @if (tx.RelatedAccountId.HasValue)
                                     {
-                                        <span class="text-muted">(Ref Acc: #@tx.RelatedAccountId.Value)</span>
+                                        <span class="text-muted small ms-1">(Ref Acc: #@tx.RelatedAccountId.Value)</span>
                                     }
                                 </td>
-                                <td class="text-end text-success fw-bold">
-                                    @(isCredit ? $"৳{tx.Amount:N2}" : "—")
+                                <td class="text-end font-monospace @(isCredit ? "text-success fw-bold fs-6" : "text-muted")">
+                                    @(isCredit ? $"+৳{tx.Amount:N2}" : "—")
                                 </td>
-                                <td class="text-end text-danger fw-bold">
-                                    @(!isCredit ? $"৳{tx.Amount:N2}" : "—")
+                                <td class="text-end font-monospace @(!isCredit ? "text-danger fw-bold fs-6" : "text-muted")">
+                                    @(!isCredit ? $"-৳{tx.Amount:N2}" : "—")
                                 </td>
                             </tr>
                         }
@@ -141,27 +251,31 @@
                     else
                     {
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">No transactions recorded for the selected date range.</td>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-3 d-block mb-1 text-secondary"></i>
+                                No transactions recorded for the selected date range.
+                            </td>
                         </tr>
                     }
                 </tbody>
-                <tfoot class="table-light fw-bold">
+                <tfoot class="fw-bold" style="border-top: 2px solid rgba(255, 255, 255, 0.12);">
                     <tr>
-                        <td colspan="3" class="text-end">PERIOD TOTALS:</td>
-                        <td class="text-end text-success">+৳@totalCredits.ToString("N2")</td>
-                        <td class="text-end text-danger">-৳@totalDebits.ToString("N2")</td>
+                        <td colspan="3" class="text-end text-uppercase small py-3" style="background: rgba(15, 23, 42, 0.95) !important; color: #94a3b8 !important;">PERIOD TOTALS:</td>
+                        <td class="text-end font-monospace fs-6 py-3" style="background: rgba(15, 23, 42, 0.95) !important; color: #34d399 !important;">+৳@totalCredits.ToString("N2")</td>
+                        <td class="text-end font-monospace fs-6 py-3" style="background: rgba(15, 23, 42, 0.95) !important; color: #f87171 !important;">-৳@totalDebits.ToString("N2")</td>
                     </tr>
                 </tfoot>
+
             </table>
         </div>
 
         <!-- Official Bank Seal & Sign Off -->
-        <div class="d-flex justify-content-between align-items-end pt-4 mt-4 border-top">
-            <div class="small text-muted" style="max-width: 400px;">
+        <div class="d-flex justify-content-between align-items-end pt-4 mt-4 border-top border-secondary-subtle">
+            <div class="small text-muted" style="max-width: 420px;">
                 <em>This statement is an electronically generated legal document from SmartBank Digital Banking Core. It is valid without manual stamp or signature under the Digital Banking Act.</em>
             </div>
             <div class="text-center">
-                <div class="border-bottom border-dark pb-1 mb-1" style="width: 180px;">
+                <div class="border-bottom border-secondary pb-1 mb-1" style="width: 180px;">
                     <span class="font-monospace fw-bold small text-primary">SmartBank Core Ledger</span>
                 </div>
                 <div class="small text-muted">Authorized Bank Officer</div>
