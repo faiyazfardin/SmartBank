@@ -14,6 +14,10 @@ namespace SmartBank.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
         public DbSet<LoanApplication> LoanApplications { get; set; } = null!;
+        public DbSet<LoanInstallment> LoanInstallments { get; set; } = null!;
+        public DbSet<LoanPayment> LoanPayments { get; set; } = null!;
+        public DbSet<LoanRatePolicy> LoanRatePolicies { get; set; } = null!;
+        public DbSet<LoanAuditLog> LoanAuditLogs { get; set; } = null!;
         public DbSet<ExternalLogin> ExternalLogins { get; set; } = null!;
         public DbSet<OtpChallenge> OtpChallenges { get; set; } = null!;
         public DbSet<PendingTransaction> PendingTransactions { get; set; } = null!;
@@ -35,6 +39,8 @@ namespace SmartBank.Data
                 entity.Property(u => u.Role).IsRequired().HasMaxLength(50).HasDefaultValue("Customer");
                 entity.Property(u => u.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Active");
                 entity.Property(u => u.IsEmailVerified).HasDefaultValue(false);
+                entity.Property(u => u.IsFirstLogin).HasDefaultValue(true);
+                entity.Property(u => u.FailedVaultAttempts).HasDefaultValue(0);
 
                 // Indexes and Uniqueness
                 entity.HasIndex(u => u.Username).IsUnique();
@@ -99,6 +105,12 @@ namespace SmartBank.Data
                 entity.Property(l => l.AdminNote).HasMaxLength(1000);
                 entity.Property(l => l.ReviewedBy).HasMaxLength(100);
 
+                entity.Property(l => l.ApprovedAmount).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.FinalInterestRate).HasColumnType("decimal(5,2)");
+                entity.Property(l => l.FinalEmi).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.TotalRepayable).HasColumnType("decimal(18,2)");
+                entity.Property(l => l.IndicativeRate).HasColumnType("decimal(5,2)");
+
                 // Indexes
                 entity.HasIndex(l => l.ApplicationNumber).IsUnique();
                 entity.HasIndex(l => l.UserId);
@@ -114,6 +126,129 @@ namespace SmartBank.Data
                 entity.HasOne(l => l.Account)
                     .WithMany(a => a.LoanApplications)
                     .HasForeignKey(l => l.AccountId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // LoanInstallment configuration
+            modelBuilder.Entity<LoanInstallment>(entity =>
+            {
+                entity.HasKey(i => i.Id);
+                entity.Property(i => i.OpeningBalance).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.PrincipalPortion).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.InterestPortion).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.TotalDue).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.ClosingBalance).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.PaidAmount).HasColumnType("decimal(18,2)").HasDefaultValue(0.00m);
+                entity.Property(i => i.LateFeeApplied).HasColumnType("decimal(18,2)").HasDefaultValue(0.00m);
+                entity.Property(i => i.Status).HasConversion<string>().HasMaxLength(50).HasDefaultValue(InstallmentStatus.Pending);
+                entity.Property(i => i.PaymentMethod).HasMaxLength(50);
+                entity.Property(i => i.TransactionReference).HasMaxLength(100);
+
+                // Indexes
+                entity.HasIndex(i => i.LoanApplicationId).HasDatabaseName("IX_LoanInstallments_LoanApplicationId");
+                entity.HasIndex(i => new { i.DueDate, i.Status }).HasDatabaseName("IX_LoanInstallments_DueDate_Status");
+
+                // Relationships
+                entity.HasOne(i => i.LoanApplication)
+                    .WithMany(l => l.Installments)
+                    .HasForeignKey(i => i.LoanApplicationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // LoanPayment configuration
+            modelBuilder.Entity<LoanPayment>(entity =>
+            {
+                entity.HasKey(p => p.Id);
+                entity.Property(p => p.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(p => p.Method).HasConversion<string>().HasMaxLength(50).HasDefaultValue(LoanPaymentMethod.AccountDebit);
+                entity.Property(p => p.ReferenceNumber).IsRequired().HasMaxLength(100);
+                entity.Property(p => p.RecordedBy).IsRequired().HasMaxLength(100).HasDefaultValue("SYSTEM");
+                entity.Property(p => p.Notes).HasMaxLength(1000);
+
+                // Indexes
+                entity.HasIndex(p => p.ReferenceNumber).IsUnique().HasDatabaseName("IX_LoanPayments_ReferenceNumber");
+                entity.HasIndex(p => p.LoanApplicationId);
+                entity.HasIndex(p => p.InstallmentId);
+
+                // Relationships
+                entity.HasOne(p => p.LoanApplication)
+                    .WithMany(l => l.Payments)
+                    .HasForeignKey(p => p.LoanApplicationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(p => p.Installment)
+                    .WithMany(i => i.Payments)
+                    .HasForeignKey(p => p.InstallmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // LoanRatePolicy configuration & Seeding
+            modelBuilder.Entity<LoanRatePolicy>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.Category).IsRequired().HasMaxLength(50);
+                entity.Property(r => r.BaseAnnualRate).HasColumnType("decimal(5,2)");
+                entity.Property(r => r.IsActive).HasDefaultValue(true);
+
+                // Seed 3 baseline underwriting policy bands
+                entity.HasData(
+                    new LoanRatePolicy
+                    {
+                        Id = 1,
+                        Category = "Excellent",
+                        MinScore = 80,
+                        MaxScore = 100,
+                        BaseAnnualRate = 8.00m,
+                        MinTenureMonths = 6,
+                        MaxTenureMonths = 60,
+                        IsActive = true,
+                        EffectiveFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new LoanRatePolicy
+                    {
+                        Id = 2,
+                        Category = "Good",
+                        MinScore = 65,
+                        MaxScore = 79,
+                        BaseAnnualRate = 10.50m,
+                        MinTenureMonths = 6,
+                        MaxTenureMonths = 48,
+                        IsActive = true,
+                        EffectiveFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    },
+                    new LoanRatePolicy
+                    {
+                        Id = 3,
+                        Category = "ReviewRequired",
+                        MinScore = 50,
+                        MaxScore = 64,
+                        BaseAnnualRate = 13.00m,
+                        MinTenureMonths = 6,
+                        MaxTenureMonths = 36,
+                        IsActive = true,
+                        EffectiveFrom = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    }
+                );
+            });
+
+            // LoanAuditLog configuration
+            modelBuilder.Entity<LoanAuditLog>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+                entity.Property(a => a.Action).IsRequired().HasMaxLength(100);
+                entity.Property(a => a.FieldChanged).HasMaxLength(100);
+                entity.Property(a => a.OldValue).HasMaxLength(500);
+                entity.Property(a => a.NewValue).HasMaxLength(500);
+                entity.Property(a => a.PerformedBy).IsRequired().HasMaxLength(100);
+                entity.Property(a => a.Note).HasMaxLength(1000);
+
+                // Index
+                entity.HasIndex(a => new { a.LoanApplicationId, a.PerformedAt }).HasDatabaseName("IX_LoanAuditLogs_LoanApplicationId_PerformedAt");
+
+                // Relationship
+                entity.HasOne(a => a.LoanApplication)
+                    .WithMany(l => l.AuditLogs)
+                    .HasForeignKey(a => a.LoanApplicationId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 

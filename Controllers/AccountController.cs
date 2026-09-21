@@ -164,11 +164,6 @@ namespace SmartBank.Controllers
 
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-                if (dbUser.MustChangePasswordOnNextLogin)
-                {
-                    return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
-                }
-
                 TempData["SuccessToast"] = $"Welcome back Administrator, {dbUser.FullName}!";
 
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -179,10 +174,10 @@ namespace SmartBank.Controllers
                 return RedirectToAction("Users", "Admin");
             }
 
-            // EXCEPTION RULE: If user is logging in using the default temporary password provided via mail upon admin approval
-            if (dbUser.MustChangePasswordOnNextLogin)
+            // EXCEPTION RULE: If user is logging in on first login or using default temporary password
+            if (dbUser.IsFirstLogin || dbUser.MustChangePasswordOnNextLogin)
             {
-                // OTP is NOT needed. Sign in directly and force password change.
+                // OTP is NOT needed for initial forced password change. Sign in directly and force change.
                 var claims = new List<Claim>
                 {
                     new Claim(ClaimTypes.NameIdentifier, dbUser.Id.ToString()),
@@ -206,7 +201,7 @@ namespace SmartBank.Controllers
                 };
 
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), authProperties);
-                return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                return RedirectToAction(nameof(FirstLoginPasswordChange));
             }
 
             // DEFAULT RULE: All Admin-verified Active accounts require 6-digit email OTP after login
@@ -463,10 +458,10 @@ namespace SmartBank.Controllers
                     return RedirectToAction("Users", "Admin");
                 }
 
-                // EXCEPTION RULE: If user account requires default temporary password change upon admin approval
-                if (user.MustChangePasswordOnNextLogin)
+                // EXCEPTION RULE: If user account requires first-time login security setup or password change
+                if (user.IsFirstLogin || user.MustChangePasswordOnNextLogin)
                 {
-                    // OTP is NOT needed. Sign in directly and force password change.
+                    // OTP is NOT needed for initial forced password change. Sign in directly and force change.
                     var defaultAccount = user.Accounts.FirstOrDefault();
                     var claims = new List<Claim>
                     {
@@ -491,7 +486,7 @@ namespace SmartBank.Controllers
                     };
                     await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, authPrincipal, authProperties);
 
-                    return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                    return RedirectToAction(nameof(FirstLoginPasswordChange));
                 }
 
                 // DEFAULT RULE: Active Admin-verified account requires 6-digit email OTP after Google login
@@ -686,9 +681,9 @@ namespace SmartBank.Controllers
 
             TempData["SuccessToast"] = $"Welcome back, {user.FullName}!";
 
-            if (user.MustChangePasswordOnNextLogin)
+            if (user.IsFirstLogin || user.MustChangePasswordOnNextLogin)
             {
-                return RedirectToAction("ChangePassword", "Account", new { forced = "true" });
+                return RedirectToAction(nameof(FirstLoginPasswordChange));
             }
 
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
@@ -865,6 +860,112 @@ namespace SmartBank.Controllers
         [ValidateAntiForgeryToken]
         public Task<IActionResult> CompleteGoogleRegistration(CompleteGoogleProfileViewModel model)
             => CompleteGoogleProfile(model);
+
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> FirstLoginPasswordChange()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            if (!user.IsFirstLogin && !user.MustChangePasswordOnNextLogin)
+            {
+                return RedirectToAction("Index", "Dashboard");
+            }
+
+            return View(new FirstLoginPasswordChangeViewModel());
+        }
+
+        [Authorize]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FirstLoginPasswordChange(FirstLoginPasswordChangeViewModel model)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null)
+            {
+                return RedirectToAction(nameof(Login));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            // 1. Verify Current Account Password
+            if (!SmartBank.Security.PasswordHasher.VerifyPassword(model.CurrentAccountPassword, user.PasswordHash))
+            {
+                ModelState.AddModelError(nameof(model.CurrentAccountPassword), "Incorrect Current Account Password.");
+                return View(model);
+            }
+
+            // 2. Verify Current Vault Password
+            if (!string.IsNullOrEmpty(user.VaultPasswordHash))
+            {
+                if (!SmartBank.Security.PasswordHasher.VerifyPassword(model.CurrentVaultPassword, user.VaultPasswordHash))
+                {
+                    ModelState.AddModelError(nameof(model.CurrentVaultPassword), "Incorrect Current Vault Password.");
+                    return View(model);
+                }
+            }
+
+            // 3. Validate Account Password Strength
+            var (isAccValid, accError) = SmartBank.Security.PasswordValidator.Validate(model.NewAccountPassword);
+            if (!isAccValid)
+            {
+                ModelState.AddModelError(nameof(model.NewAccountPassword), accError);
+                return View(model);
+            }
+
+            // 4. Validate Vault Password Strength
+            var (isVltValid, vltError) = SmartBank.Security.PasswordValidator.Validate(model.NewVaultPassword);
+            if (!isVltValid)
+            {
+                ModelState.AddModelError(nameof(model.NewVaultPassword), vltError);
+                return View(model);
+            }
+
+            // 5. Ensure Vault Password differs from Account Password
+            if (model.NewVaultPassword.Trim() == model.NewAccountPassword.Trim())
+            {
+                ModelState.AddModelError(nameof(model.NewVaultPassword), "Security Vault Password must be different from your Account Login Password.");
+                return View(model);
+            }
+
+            // Update user passwords and clear first login flags
+            user.PasswordHash = SmartBank.Security.PasswordHasher.HashPassword(model.NewAccountPassword.Trim());
+            user.VaultPasswordHash = SmartBank.Security.PasswordHasher.HashPassword(model.NewVaultPassword.Trim());
+            user.VaultPasswordSetAt = DateTime.UtcNow;
+            user.IsFirstLogin = false;
+            user.MustChangePasswordOnNextLogin = false;
+            user.TemporaryPasswordIssuedAtUtc = null;
+            user.FailedVaultAttempts = 0;
+            user.VaultLockedUntil = null;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessToast"] = "Both Account and Vault passwords have been updated securely! Welcome to SmartBank.";
+
+            return user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+                ? RedirectToAction("Users", "Admin")
+                : RedirectToAction("Index", "Dashboard");
+        }
 
         [Authorize]
         [HttpGet]

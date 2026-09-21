@@ -1,0 +1,765 @@
+@{
+    ViewData["Title"] = "Security Vault";
+    Layout = "_Layout";
+
+    bool isUnlocked = ViewBag.IsUnlocked ?? false;
+    bool isLockedOut = ViewBag.IsLockedOut ?? false;
+    int remainingLockoutSeconds = ViewBag.RemainingLockoutSeconds ?? 0;
+    int failedAttempts = ViewBag.FailedAttempts ?? 0;
+    var user = ViewBag.User as SmartBank.Entities.User;
+    var account = ViewBag.Account as SmartBank.Entities.Account;
+    var transactions = ViewBag.Transactions as List<SmartBank.Entities.Transaction> ?? new List<SmartBank.Entities.Transaction>();
+    decimal totalInflow = ViewBag.TotalInflow ?? 0m;
+    decimal totalOutflow = ViewBag.TotalOutflow ?? 0m;
+    string selectedType = ViewBag.SelectedType as string ?? "";
+    string search = ViewBag.Search as string ?? "";
+    int sessionTimeoutSeconds = ViewBag.SessionTimeoutSeconds ?? 300;
+
+    var fullName = user?.FullName ?? "Customer";
+    var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => s[0])).ToUpper();
+    if (string.IsNullOrEmpty(initials)) { initials = "SB"; }
+}
+
+<div class="container py-4">
+    @if (!isUnlocked)
+    {
+        <!-- ========================================================================= -->
+        <!-- LOCKED VAULT VIEW: Security Unlock Card                                   -->
+        <!-- ========================================================================= -->
+        <div class="row justify-content-center py-5">
+            <div class="col-md-8 col-lg-6 col-xl-5">
+                <div class="sb-card p-4 p-md-5 text-center shadow-2xl position-relative overflow-hidden border-top border-primary border-3">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle p-3 mb-3" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.35);">
+                        <i class="bi bi-shield-lock-fill fs-1 text-info animate-pulse"></i>
+                    </div>
+
+                    <h3 class="fw-bold text-white mb-2">SmartBank Security Vault</h3>
+                    <p class="text-muted small mb-4">
+                        Your account balance, card credentials, and itemized transaction history are protected inside your encrypted Vault. Enter your <strong>Vault Password</strong> to unlock.
+                    </p>
+
+                    @if (TempData["VaultError"] != null)
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small text-start mb-4" style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3) !important; color: #fecdd3;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                                <div>@TempData["VaultError"]</div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (isLockedOut)
+                    {
+                        <div class="alert alert-warning border-0 shadow-sm small text-start mb-4" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3) !important; color: #fde68a;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-hourglass-split fs-4"></i>
+                                <div>
+                                    <strong>Vault Access Cooldown:</strong> Too many failed attempts. Vault is temporarily locked.
+                                    <div class="fw-bold mt-1 text-warning" id="lockoutTimerDisplay">Remaining: @(remainingLockoutSeconds / 60)m @(remainingLockoutSeconds % 60)s</div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <form asp-controller="Vault" asp-action="Unlock" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3 text-start">
+                            <label class="form-label small fw-semibold text-secondary">Security Vault Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-key-fill text-warning"></i></span>
+                                <input type="password" name="vaultPassword" id="vaultPasswordInput" class="form-control" placeholder="Enter vault password" @(isLockedOut ? "disabled" : "") required autofocus />
+                                <button type="button" class="btn btn-outline-secondary" onclick="togglePassVisibility('vaultPasswordInput', this)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-sb-primary btn-lg rounded-pill fw-bold shadow-glow" @(isLockedOut ? "disabled" : "")>
+                                <i class="bi bi-unlock-fill me-2"></i> Unlock Secure Vault
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top border-secondary-subtle small">
+                        <a asp-controller="Dashboard" asp-action="Index" class="text-secondary text-decoration-none">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+                        </a>
+                        <button type="button" class="btn btn-link btn-sm text-info text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#forgotVaultModal">
+                            Forgot Vault Password?
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- ========================================================================= -->
+        <!-- UNLOCKED VAULT VIEW: Full Financial Dashboard + History + Security Tabs    -->
+        <!-- ========================================================================= -->
+
+        <!-- Top Status & Timer Bar -->
+        <div class="sb-card p-3 mb-4 shadow-sm">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="d-inline-flex align-items-center justify-content-center bg-success bg-gradient text-white rounded-circle p-2 shadow-sm" style="width: 44px; height: 44px;">
+                        <i class="bi bi-shield-check fs-4"></i>
+                    </span>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="fw-bold text-white mb-0">Financial Security Vault</h5>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill small">
+                                <i class="bi bi-circle-fill" style="font-size: 0.5rem;"></i> Active Session
+                            </span>
+                        </div>
+                        <div class="small text-muted">Encrypted Ledger Data &bull; Auto-locks after 5 minutes of inactivity</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Edit Profile Quick Action -->
+                    <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3 shadow-sm" onclick="document.getElementById('tab-edit-profile').click(); document.getElementById('vault-profile-section').scrollIntoView({behavior: 'smooth'});">
+                        <i class="bi bi-person-gear me-1"></i> Edit Profile
+                    </button>
+
+                    <!-- Live Session Countdown Timer -->
+                    <div class="d-flex align-items-center gap-2 px-3 py-1.5 rounded-pill" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.3);">
+                        <i class="bi bi-clock-history text-info"></i>
+                        <span class="small text-muted">Session:</span>
+                        <strong class="font-monospace text-white fs-6" id="vaultSessionTimer">05:00</strong>
+                    </div>
+
+                    <!-- Manual Lock Button -->
+                    <form asp-controller="Vault" asp-action="Lock" method="post" class="m-0">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-sm" title="Lock vault now">
+                            <i class="bi bi-lock-fill me-1"></i> Lock Vault
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 1: 3D Debit Card & Key Financial Metrics -->
+        <div class="row g-4 mb-4">
+            <!-- 3D Debit Card -->
+            <div class="col-lg-5 col-xl-4">
+                <div class="smart-debit-card h-100 shadow-md">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="fs-4 fw-bold">Smart<span class="text-info">Bank</span></span>
+                        <span class="badge bg-white-50 text-white rounded-pill px-3 py-1 small">PREMIER PLATINUM</span>
+                    </div>
+                    <div class="my-3">
+                        <div class="card-chip mb-3"></div>
+                        <div class="card-number" id="cardAccNumber">
+                            @(account != null ? string.Join(" ", Enumerable.Range(0, (account.AccountNumber.Length + 3) / 4).Select(i => account.AccountNumber.Substring(i * 4, Math.Min(4, account.AccountNumber.Length - i * 4)))) : "•••• •••• •••• ••••")
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <div>
+                                <div class="small opacity-75" style="font-size: 0.65rem;">CARDHOLDER</div>
+                                <div class="card-holder text-truncate" style="max-width: 180px;">@fullName</div>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-light border-0 py-0 px-2" onclick="copyToClipboard('@(account?.AccountNumber)', this)">
+                                    <i class="bi bi-copy"></i> Copy Acc#
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balance & Inflow/Outflow Metrics -->
+            <div class="col-lg-7 col-xl-8">
+                <div class="row g-3">
+                    <!-- Available Balance Card -->
+                    <div class="col-sm-6">
+                        <div class="stat-widget h-100">
+                            <div class="stat-icon-wrapper stat-icon-primary">
+                                <i class="bi bi-wallet2"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="text-muted small fw-semibold d-flex justify-content-between align-items-center">
+                                    <span>AVAILABLE BALANCE</span>
+                                    <button type="button" id="btnToggleBalance" class="btn btn-link btn-sm p-0 text-muted text-decoration-none small" onclick="toggleBalanceDisplay()">
+                                        <i class="bi bi-eye-slash" id="balanceEyeIcon"></i>
+                                    </button>
+                                </div>
+                                <div class="fs-3 fw-bold text-white mt-1" id="valBalanceReal">
+                                    @(account != null ? $"৳{account.Balance:N2}" : "৳0.00")
+                                </div>
+                                <div class="fs-3 fw-bold text-white mt-1 d-none font-monospace" id="valBalanceMasked">
+                                    ••••••••
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    Account: <code class="text-info fw-bold font-monospace">@(account?.AccountNumber ?? "N/A")</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Status Card -->
+                    <div class="col-sm-6">
+                        <div class="stat-widget h-100">
+                            <div class="stat-icon-wrapper stat-icon-success">
+                                <i class="bi bi-shield-check"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-semibold">ACCOUNT STATUS</div>
+                                <div class="mt-1">
+                                    @if (account != null && account.IsActive)
+                                    {
+                                        <span class="badge-active">
+                                            <i class="bi bi-check-circle-fill"></i> Active &amp; Verified
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-frozen">
+                                            <i class="bi bi-snow2"></i> Restricted / Frozen
+                                        </span>
+                                    }
+                                </div>
+                                <div class="small text-muted mt-1">Tier: Tier 1 Standard Checking</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Inflow (Credits) -->
+                    <div class="col-sm-6">
+                        <div class="stat-widget h-100">
+                            <div class="stat-icon-wrapper stat-icon-success">
+                                <i class="bi bi-arrow-down-left"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-semibold">TOTAL INFLOW (CREDITS)</div>
+                                <div class="fs-4 fw-bold text-success mt-1">
+                                    +৳@totalInflow.ToString("N2")
+                                </div>
+                                <div class="small text-muted mt-1">Deposits &amp; Incoming Transfers</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Outflow (Debits) -->
+                    <div class="col-sm-6">
+                        <div class="stat-widget h-100">
+                            <div class="stat-icon-wrapper stat-icon-danger">
+                                <i class="bi bi-arrow-up-right"></i>
+                            </div>
+                            <div>
+                                <div class="text-muted small fw-semibold">TOTAL OUTFLOW (DEBITS)</div>
+                                <div class="fs-4 fw-bold text-danger mt-1">
+                                    -৳@totalOutflow.ToString("N2")
+                                </div>
+                                <div class="small text-muted mt-1">Withdrawals, Transfers &amp; Bills</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Full Transaction History & Ledger -->
+        <div class="sb-card p-0 overflow-hidden mb-4 shadow-md">
+            <div class="p-3 bg-dark bg-opacity-50 border-bottom border-secondary-subtle d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-receipt text-primary fs-5"></i>
+                    <h6 class="fw-bold text-white mb-0">Itemized Transaction Record &amp; Ledger</h6>
+                </div>
+                <div class="d-flex gap-2">
+                    <a asp-controller="Transaction" asp-action="Statement" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Official Statement
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="p-3 border-bottom border-secondary-subtle bg-dark bg-opacity-25">
+                <div class="row g-2 align-items-center">
+                    <div class="col-lg-8">
+                        <div class="d-flex flex-wrap gap-2">
+                            <a asp-controller="Vault" asp-action="Index" class="btn btn-sm rounded-pill @(string.IsNullOrEmpty(selectedType) ? "btn-primary" : "btn-outline-secondary")">All</a>
+                            <a asp-controller="Vault" asp-action="Index" asp-route-typeFilter="Deposit" class="btn btn-sm rounded-pill @(selectedType == "Deposit" ? "btn-success" : "btn-outline-secondary")">Deposits</a>
+                            <a asp-controller="Vault" asp-action="Index" asp-route-typeFilter="Withdraw" class="btn btn-sm rounded-pill @(selectedType == "Withdraw" ? "btn-danger" : "btn-outline-secondary")">Withdrawals</a>
+                            <a asp-controller="Vault" asp-action="Index" asp-route-typeFilter="TransferIn" class="btn btn-sm rounded-pill @(selectedType == "TransferIn" ? "btn-info text-white" : "btn-outline-secondary")">Transfers In</a>
+                            <a asp-controller="Vault" asp-action="Index" asp-route-typeFilter="TransferOut" class="btn btn-sm rounded-pill @(selectedType == "TransferOut" ? "btn-warning text-dark" : "btn-outline-secondary")">Transfers Out</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-search"></i></span>
+                            <input type="text" id="vaultTxSearchInput" class="form-control" placeholder="Search by amount, ref ID..." />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table sb-table align-middle mb-0" id="vaultTxTable">
+                    <thead>
+                        <tr>
+                            <th>Ref / Transaction ID</th>
+                            <th>Type &amp; Description</th>
+                            <th>Amount (৳)</th>
+                            <th>Timestamp</th>
+                            <th>Related Account</th>
+                            <th class="text-end">Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (transactions != null && transactions.Any())
+                        {
+                            @foreach (var tx in transactions)
+                            {
+                                var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
+                                <tr>
+                                    <td>
+                                        <span class="badge font-monospace px-2 py-1" style="background: rgba(255, 255, 255, 0.08); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">
+                                            #TX-@tx.Id.ToString("D6")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (tx.Type == SmartBank.Entities.TransactionType.Deposit)
+                                        {
+                                            <span class="badge-active me-1"><i class="bi bi-arrow-down-left"></i> Deposit</span>
+                                        }
+                                        else if (tx.Type == SmartBank.Entities.TransactionType.Withdraw)
+                                        {
+                                            <span class="badge-frozen me-1"><i class="bi bi-arrow-up-right"></i> Withdrawal</span>
+                                        }
+                                        else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
+                                        {
+                                            <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill me-1"><i class="bi bi-arrow-down-left"></i> Transfer In</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-suspended me-1"><i class="bi bi-arrow-up-right"></i> Transfer Out</span>
+                                        }
+                                    </td>
+                                    <td class="fw-bold font-monospace @(isCredit ? "text-success" : "text-danger") fs-6">
+                                        @(isCredit ? "+" : "-")৳@tx.Amount.ToString("N2")
+                                    </td>
+                                    <td class="text-muted small">
+                                        @tx.Timestamp.ToString("MMM dd, yyyy HH:mm:ss")
+                                    </td>
+                                    <td class="small text-secondary">
+                                        @(tx.RelatedAccountId.HasValue ? $"Acc #{tx.RelatedAccountId.Value}" : "Self / ATM Operation")
+                                    </td>
+                                    <td class="text-end">
+                                        <a asp-controller="Transaction" asp-action="Receipt" asp-route-id="@tx.Id" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
+                                            <i class="bi bi-receipt me-1"></i> Receipt
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">
+                                    <i class="bi bi-inbox fs-2 d-block text-secondary mb-2"></i>
+                                    No transactions found matching your criteria.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Row 3: Security, Profile & Change Password Section (Three Tabs) -->
+        <div class="sb-card p-4 p-md-5 mb-4 shadow-md border-top border-info border-3" id="vault-profile-section">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary-subtle">
+                <i class="bi bi-shield-lock-fill fs-4 text-info"></i>
+                <div>
+                    <h5 class="fw-bold text-white mb-0">Vault Security &amp; Profile Management</h5>
+                    <div class="small text-muted">Update your Personal Profile Details, Account Login Password, or Security Vault Password</div>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active rounded-pill px-4 fw-semibold" id="tab-edit-profile" data-bs-toggle="pill" data-bs-target="#panel-edit-profile" type="button" role="tab">
+                        <i class="bi bi-person-gear me-1"></i> Edit Profile Details
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill px-4 fw-semibold ms-2" id="tab-account-pass" data-bs-toggle="pill" data-bs-target="#panel-account-pass" type="button" role="tab">
+                        <i class="bi bi-person-lock me-1"></i> Change Account Password
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill px-4 fw-semibold ms-2" id="tab-vault-pass" data-bs-toggle="pill" data-bs-target="#panel-vault-pass" type="button" role="tab">
+                        <i class="bi bi-safe2 me-1"></i> Change Vault Password
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tabs Content -->
+            <div class="tab-content" id="pills-tabContent">
+                <!-- Tab 1: Edit Profile Information -->
+                <div class="tab-pane fade show active" id="panel-edit-profile" role="tabpanel">
+                    <form asp-controller="Vault" asp-action="UpdateProfile" method="post" class="row g-3" style="max-width: 600px;">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Full Legal Name</label>
+                            <input type="text" name="fullName" class="form-control" value="@user?.FullName" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Email Address</label>
+                            <input type="email" name="email" class="form-control" value="@user?.Email" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Phone Number</label>
+                            <input type="tel" name="phoneNumber" class="form-control" value="@user?.PhoneNumber" placeholder="+880 1711-000000" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Account Number</label>
+                            <input type="text" class="form-control font-monospace text-info bg-dark opacity-75" value="@(account?.AccountNumber ?? "N/A")" readonly disabled />
+                            <div class="form-text text-secondary small">Account numbers are permanently bound to your banking profile.</div>
+                        </div>
+                        <div class="col-12 pt-2">
+                            <button type="submit" class="btn btn-sb-primary rounded-pill px-4 fw-semibold">
+                                <i class="bi bi-check2-circle me-1"></i> Save Profile Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab 2: Change Account Password -->
+                <div class="tab-pane fade" id="panel-account-pass" role="tabpanel">
+                    <form asp-controller="Vault" asp-action="ChangeAccountPassword" method="post" class="row g-3" style="max-width: 600px;">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Current Account Password</label>
+                            <input type="password" name="currentPassword" class="form-control" placeholder="Enter current login password" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">New Account Password</label>
+                            <input type="password" name="newPassword" id="vaultTabAccNew" class="form-control" placeholder="Minimum 8 characters" required />
+                            <div class="p-2 rounded-3 mt-2 small" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="d-flex align-items-center gap-2" id="vAccLen"><i class="bi bi-circle text-muted"></i> <span>Min 8 chars with Upper, Lower, Number, Special</span></div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Confirm New Account Password</label>
+                            <input type="password" name="confirmPassword" class="form-control" placeholder="Repeat new account password" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sb-primary rounded-pill px-4 fw-semibold">
+                                <i class="bi bi-check2-circle me-1"></i> Update Account Password
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab 3: Change Vault Password -->
+                <div class="tab-pane fade" id="panel-vault-pass" role="tabpanel">
+                    <form asp-controller="Vault" asp-action="ChangeVaultPassword" method="post" class="row g-3" style="max-width: 600px;">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Current Vault Password</label>
+                            <input type="password" name="currentVaultPassword" class="form-control" placeholder="Enter current vault password" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">New Vault Password</label>
+                            <input type="password" name="newVaultPassword" id="vaultTabVltNew" class="form-control" placeholder="Must differ from account password" required />
+                            <div class="p-2 rounded-3 mt-2 small" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="d-flex align-items-center gap-2" id="vVltLen"><i class="bi bi-circle text-muted"></i> <span>Min 8 chars with Upper, Lower, Number, Special</span></div>
+                                <div class="d-flex align-items-center gap-2 text-info" id="vVltDiff"><i class="bi bi-shield-check"></i> <span>Must be different from your Account Login Password</span></div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Confirm New Vault Password</label>
+                            <input type="password" name="confirmVaultPassword" class="form-control" placeholder="Repeat new vault password" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sb-primary rounded-pill px-4 fw-semibold">
+                                <i class="bi bi-safe2 me-1"></i> Update Vault Password
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- ========================================================================= -->
+<!-- FORGOT VAULT PASSWORD MODAL (Identity Verification -> OTP -> New Vault)   -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="forgotVaultModal" tabindex="-1" aria-labelledby="forgotVaultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-2xl">
+            <div class="modal-header border-secondary-subtle">
+                <h5 class="modal-title fw-bold text-white" id="forgotVaultModalLabel">
+                    <i class="bi bi-key-fill text-warning me-2"></i> Reset Security Vault Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="forgotStep1">
+                    <p class="small text-muted mb-3">
+                        To reset your Vault Password, please verify your identity by entering your <strong>Account Login Password</strong>. We will then send an OTP verification code to your email.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Account Login Password</label>
+                        <input type="password" id="forgotAccPassInput" class="form-control" placeholder="Enter your login password" />
+                        <div id="forgotAccPassError" class="text-danger small mt-1 d-none"></div>
+                    </div>
+                    <button type="button" class="btn btn-sb-primary w-100 rounded-pill fw-semibold" onclick="requestVaultResetOtp()">
+                        <i class="bi bi-send me-1"></i> Send Verification Code
+                    </button>
+                </div>
+
+                <div id="forgotStep2" class="d-none">
+                    <div class="alert alert-success border-0 small mb-3">
+                        <i class="bi bi-check-circle-fill me-1"></i> Verification code sent to your email. Enter code and your new vault password below:
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">6-Digit Verification Code</label>
+                        <input type="text" id="forgotOtpInput" class="form-control font-monospace text-center fs-5" maxlength="6" placeholder="000000" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">New Security Vault Password</label>
+                        <input type="password" id="forgotNewVaultPass" class="form-control" placeholder="Minimum 8 characters" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Confirm New Vault Password</label>
+                        <input type="password" id="forgotConfirmVaultPass" class="form-control" placeholder="Repeat new vault password" />
+                        <div id="forgotStep2Error" class="text-danger small mt-1 d-none"></div>
+                    </div>
+                    <button type="button" id="btnSubmitVaultReset" class="btn btn-sb-success w-100 rounded-pill fw-semibold" onclick="submitVaultPasswordReset()">
+                        <i class="bi bi-check2-circle me-1"></i> Reset Vault Password &amp; Unlock
+                    </button>
+                </div>
+
+                <!-- Step 3: Success Confirmation State -->
+                <div id="forgotStep3" class="d-none text-center py-4">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle p-3 mb-3 shadow-lg" style="width: 68px; height: 68px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4);">
+                        <i class="bi bi-shield-check fs-1 text-success"></i>
+                    </div>
+                    <h5 class="fw-bold text-white mb-2">Vault Unlocked Successfully!</h5>
+                    <p class="text-secondary small mb-3" id="forgotSuccessMsg">
+                        Your Security Vault Password has been reset securely. Unlocking your financial vault now...
+                    </p>
+                    <div class="d-inline-flex align-items-center gap-2 text-info small">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        <span>Redirecting to your unlocked vault...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function togglePassVisibility(inputId, btn) {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            const icon = btn.querySelector("i");
+            if (el.type === "password") {
+                el.type = "text";
+                icon.className = "bi bi-eye-slash";
+            } else {
+                el.type = "password";
+                icon.className = "bi bi-eye";
+            }
+        }
+
+        function copyToClipboard(text, btn) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = "<i class='bi bi-check'></i> Copied!";
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            });
+        }
+
+        function toggleBalanceDisplay() {
+            const real = document.getElementById("valBalanceReal");
+            const masked = document.getElementById("valBalanceMasked");
+            const icon = document.getElementById("balanceEyeIcon");
+            if (real && masked) {
+                if (real.classList.contains("d-none")) {
+                    real.classList.remove("d-none");
+                    masked.classList.add("d-none");
+                    if (icon) icon.className = "bi bi-eye-slash";
+                } else {
+                    real.classList.add("d-none");
+                    masked.classList.remove("d-none");
+                    if (icon) icon.className = "bi bi-eye";
+                }
+            }
+        }
+
+        // Live Countdown Timer for Active Vault Session
+        const isVaultUnlocked = @(isUnlocked ? "true" : "false");
+        const sessionTimeoutSec = @sessionTimeoutSeconds;
+        if (isVaultUnlocked) {
+            (function () {
+                let remaining = sessionTimeoutSec;
+                const timerEl = document.getElementById("vaultSessionTimer");
+                if (timerEl) {
+                    const timerInterval = setInterval(function () {
+                        remaining--;
+                        if (remaining <= 0) {
+                            clearInterval(timerInterval);
+                            timerEl.innerText = "00:00";
+                            window.location.reload();
+                            return;
+                        }
+                        const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+                        const s = (remaining % 60).toString().padStart(2, '0');
+                        timerEl.innerText = m + ":" + s;
+                    }, 1000);
+                }
+            })();
+        }
+
+        // Lockout countdown timer
+        const isVaultLockedOut = @(isLockedOut ? "true" : "false");
+        let lockoutRemaining = @remainingLockoutSeconds;
+        if (isVaultLockedOut && lockoutRemaining > 0) {
+            (function () {
+                const lockoutEl = document.getElementById("lockoutTimerDisplay");
+                if (lockoutEl) {
+                    const lockoutInterval = setInterval(function () {
+                        lockoutRemaining--;
+                        if (lockoutRemaining <= 0) {
+                            clearInterval(lockoutInterval);
+                            window.location.reload();
+                            return;
+                        }
+                        const m = Math.floor(lockoutRemaining / 60);
+                        const s = (lockoutRemaining % 60);
+                        lockoutEl.innerText = "Remaining: " + m + "m " + s + "s";
+                    }, 1000);
+                }
+            })();
+        }
+
+        // Instant Client-side Filter for Vault Transactions Table
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.getElementById("vaultTxSearchInput");
+            if (searchInput) {
+                searchInput.addEventListener("input", function () {
+                    const query = this.value.toLowerCase().trim();
+                    const rows = document.querySelectorAll("#vaultTxTable tbody tr");
+                    rows.forEach(row => {
+                        const text = row.innerText.toLowerCase();
+                        row.style.display = text.includes(query) ? "" : "none";
+                    });
+                });
+            }
+        });
+
+        // Forgot Vault Password AJAX Functions
+        function requestVaultResetOtp() {
+            const accPass = document.getElementById("forgotAccPassInput").value;
+            const errDiv = document.getElementById("forgotAccPassError");
+            errDiv.classList.add("d-none");
+
+            if (!accPass) {
+                errDiv.innerText = "Please enter your Account Login Password.";
+                errDiv.classList.remove("d-none");
+                return;
+            }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+
+            fetch('/Vault/ForgotVaultPasswordRequest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                },
+                body: new URLSearchParams({
+                    'accountPassword': accPass,
+                    '__RequestVerificationToken': token
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById("forgotStep1").classList.add("d-none");
+                    document.getElementById("forgotStep2").classList.remove("d-none");
+                } else {
+                    errDiv.innerText = data.message || "Failed to send OTP.";
+                    errDiv.classList.remove("d-none");
+                }
+            })
+            .catch(() => {
+                errDiv.innerText = "Network error. Please try again.";
+                errDiv.classList.remove("d-none");
+            });
+        }
+
+        function submitVaultPasswordReset() {
+            const otp = document.getElementById("forgotOtpInput").value;
+            const newPass = document.getElementById("forgotNewVaultPass").value;
+            const confPass = document.getElementById("forgotConfirmVaultPass").value;
+            const btn = document.getElementById("btnSubmitVaultReset");
+            const errDiv = document.getElementById("forgotStep2Error");
+            errDiv.classList.add("d-none");
+
+            if (!otp || !newPass || !confPass) {
+                errDiv.innerText = "Please fill in all verification fields.";
+                errDiv.classList.remove("d-none");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Verifying &amp; Resetting...`;
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+
+            fetch('/Vault/ResetVaultPasswordWithOtp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                },
+                body: new URLSearchParams({
+                    'otpCode': otp,
+                    'newVaultPassword': newPass,
+                    'confirmVaultPassword': confPass,
+                    '__RequestVerificationToken': token
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Reset Vault Password &amp; Unlock`;
+
+                if (data.success) {
+                    document.getElementById("forgotStep2").classList.add("d-none");
+                    const step3 = document.getElementById("forgotStep3");
+                    if (step3) {
+                        step3.classList.remove("d-none");
+                        const msgEl = document.getElementById("forgotSuccessMsg");
+                        if (msgEl) msgEl.innerText = data.message || "Your Security Vault Password has been reset securely. Unlocking your financial vault now...";
+                    }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1200);
+                } else {
+                    errDiv.innerText = data.message || "Password reset failed.";
+                    errDiv.classList.remove("d-none");
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Reset Vault Password &amp; Unlock`;
+                errDiv.innerText = "Network error. Please try again.";
+                errDiv.classList.remove("d-none");
+            });
+        }
+    </script>
+}

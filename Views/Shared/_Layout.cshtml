@@ -34,7 +34,7 @@
     <header class="sticky-top">
         <nav class="navbar navbar-expand-lg navbar-dark glass-nav py-3">
             <div class="container">
-                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 text-white" href="@(isFullyAuthenticatedUser && User.IsInRole("Admin") ? Url.Action("Users", "Admin") : Url.Action("Index", "Home"))">
+                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 text-white" href="@(isFullyAuthenticatedUser ? (User.IsInRole("Admin") ? Url.Action("Users", "Admin") : Url.Action("Index", "Dashboard")) : Url.Action("Index", "Home"))">
                     <span class="brand-icon-box">
                         <i class="bi bi-bank fs-5"></i>
                     </span>
@@ -64,6 +64,19 @@
                                 </a>
                             </li>
                         }
+                        else if (isFullyAuthenticatedUser)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-white fw-semibold d-flex align-items-center gap-1" asp-controller="Dashboard" asp-action="Index">
+                                    <i class="bi bi-grid-fill text-primary"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-warning fw-semibold d-flex align-items-center gap-1" asp-controller="Vault" asp-action="Index">
+                                    <i class="bi bi-shield-lock-fill text-warning"></i> Vault
+                                </a>
+                            </li>
+                        }
                         else
                         {
                             <li class="nav-item">
@@ -71,68 +84,6 @@
                                     <i class="bi bi-house-door me-1"></i> Home
                                 </a>
                             </li>
-                            @if (isFullyAuthenticatedUser)
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-white" asp-controller="Dashboard" asp-action="Index">
-                                        <i class="bi bi-grid-fill me-1 text-primary"></i> Dashboard
-                                    </a>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle text-white-50" href="#" id="txDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="bi bi-arrow-left-right me-1"></i> Banking Operations
-                                    </a>
-                                    <ul class="dropdown-menu dropdown-menu-dark shadow-lg border-0" aria-labelledby="txDropdown">
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Deposit">
-                                                <i class="bi bi-arrow-down-circle text-success me-2"></i> Deposit Money
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Withdraw">
-                                                <i class="bi bi-arrow-up-circle text-danger me-2"></i> ATM Cash Withdrawal
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Transfer">
-                                                <i class="bi bi-arrow-repeat text-warning me-2"></i> Fund Transfer
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="PayBill">
-                                                <i class="bi bi-receipt text-info me-2"></i> Pay Utility Bills
-                                            </a>
-                                        </li>
-                                        <li><hr class="dropdown-divider bg-secondary"></li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="Eligibility">
-                                                <i class="bi bi-speedometer2 text-warning me-2"></i> Loan Eligibility
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="Apply">
-                                                <i class="bi bi-cash-coin text-success me-2"></i> Apply for Loan
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Loan" asp-action="MyApplications">
-                                                <i class="bi bi-folder-check text-info me-2"></i> My Loan Applications
-                                            </a>
-                                        </li>
-                                        <li><hr class="dropdown-divider bg-secondary"></li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="History">
-                                                <i class="bi bi-clock-history text-light me-2"></i> Transaction History
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Statement">
-                                                <i class="bi bi-file-earmark-text text-primary me-2"></i> Account Statement
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </li>
-                            }
                         }
                     </ul>
 

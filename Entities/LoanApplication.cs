@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -54,7 +55,7 @@ namespace SmartBank.Entities
 
         [Required]
         [MaxLength(50)]
-        public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected, Cancelled
+        public string Status { get; set; } = "Pending"; // Pending, Approved, Disbursed, Rejected, Closed, Cancelled
 
         [MaxLength(1000)]
         public string? AdminNote { get; set; }
@@ -65,5 +66,37 @@ namespace SmartBank.Entities
 
         [MaxLength(100)]
         public string? ReviewedBy { get; set; }
+
+        // ==========================================
+        // Repayment & Underwriting Extended Fields
+        // ==========================================
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? ApprovedAmount { get; set; }
+
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal? FinalInterestRate { get; set; } // Annual % e.g. 10.50
+
+        public int? FinalTenureMonths { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? FinalEmi { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? TotalRepayable { get; set; }
+
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal? IndicativeRate { get; set; }
+
+        public int? RequestedTenureMonths { get; set; }
+
+        public DateTime? FirstInstallmentDate { get; set; }
+
+        public DateTime? DisbursedAt { get; set; }
+
+        // Navigation Collections
+        public virtual ICollection<LoanInstallment> Installments { get; set; } = new List<LoanInstallment>();
+        public virtual ICollection<LoanPayment> Payments { get; set; } = new List<LoanPayment>();
+        public virtual ICollection<LoanAuditLog> AuditLogs { get; set; } = new List<LoanAuditLog>();
     }
 }

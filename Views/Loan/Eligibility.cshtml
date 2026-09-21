@@ -43,7 +43,7 @@
 
                 <h2 class="fw-extrabold text-white mb-2">Smart Loan Eligibility</h2>
                 <p class="text-secondary mb-3" style="max-width: 580px;">
-                    Our rule-based evaluation analyzes your account maturity, liquidity history, transaction cadence, and stability score to determine instantaneous credit limits.
+                    Our rule-based evaluation analyzes your account maturity, liquidity history, and stability score to determine instantaneous credit limits.
                 </p>
 
                 <div class="d-flex flex-wrap align-items-center gap-3 pt-2">
@@ -65,9 +65,6 @@
                             <i class="bi bi-lock-fill me-1"></i> Application Locked
                         </button>
                     }
-                    <a asp-controller="Transaction" asp-action="Statement" class="btn btn-outline-light rounded-pill px-3 py-2 small">
-                        <i class="bi bi-file-earmark-spreadsheet me-1"></i> View Financial Statement
-                    </a>
                 </div>
             </div>
 
@@ -90,17 +87,17 @@
         </div>
     </div>
 
-    <!-- 3-Column Metric Highlights -->
+    <!-- 4-Column Metric Highlights -->
     <div class="row g-3 mb-4">
         <!-- Maximum Eligible Amount -->
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="stat-widget h-100">
                 <div class="stat-icon-wrapper stat-icon-success">
                     <i class="bi bi-bank"></i>
                 </div>
                 <div>
                     <div class="text-secondary small fw-semibold text-uppercase">MAX ELIGIBLE AMOUNT</div>
-                    <div class="fs-3 fw-bold text-success mt-1">
+                    <div class="fs-4 fw-bold text-success mt-1">
                         ৳@Model.MaximumAmount.ToString("N2")
                     </div>
                     <div class="small text-secondary mt-1">System Limit: ৳500,000</div>
@@ -108,34 +105,50 @@
             </div>
         </div>
 
-        <!-- Average Monthly Balance -->
-        <div class="col-md-4">
+        <!-- Indicative Rate -->
+        <div class="col-md-3">
             <div class="stat-widget h-100">
-                <div class="stat-icon-wrapper stat-icon-primary">
-                    <i class="bi bi-wallet2"></i>
+                <div class="stat-icon-wrapper stat-icon-cyan">
+                    <i class="bi bi-percent"></i>
                 </div>
                 <div>
-                    <div class="text-secondary small fw-semibold text-uppercase">AVG MONTHLY BALANCE</div>
-                    <div class="fs-3 fw-bold text-white mt-1">
-                        ৳@Model.AverageMonthlyBalance.ToString("N2")
+                    <div class="text-secondary small fw-semibold text-uppercase">INDICATIVE RATE</div>
+                    <div class="fs-4 fw-bold text-info mt-1">
+                        @Model.IndicativeRate.ToString("F2")% <span class="fs-6 fw-normal text-secondary">p.a.</span>
                     </div>
-                    <div class="small text-secondary mt-1">Current: ৳@(account?.Balance.ToString("N2") ?? "0.00")</div>
+                    <div class="small text-secondary mt-1">Tier: @Model.Category</div>
                 </div>
             </div>
         </div>
 
-        <!-- Account Age & Volume -->
-        <div class="col-md-4">
+        <!-- Sample Monthly EMI -->
+        <div class="col-md-3">
             <div class="stat-widget h-100">
-                <div class="stat-icon-wrapper stat-icon-cyan">
+                <div class="stat-icon-wrapper stat-icon-primary">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <div class="text-secondary small fw-semibold text-uppercase">SAMPLE MONTHLY EMI</div>
+                    <div class="fs-4 fw-bold text-warning mt-1">
+                        ৳@Model.SampleEmi.ToString("N2")
+                    </div>
+                    <div class="small text-secondary mt-1">Basis: 12-mo on Max Limit</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Maturity -->
+        <div class="col-md-3">
+            <div class="stat-widget h-100">
+                <div class="stat-icon-wrapper stat-icon-primary">
                     <i class="bi bi-calendar-check"></i>
                 </div>
                 <div>
                     <div class="text-secondary small fw-semibold text-uppercase">ACCOUNT MATURITY</div>
-                    <div class="fs-3 fw-bold text-info mt-1">
+                    <div class="fs-4 fw-bold text-white mt-1">
                         @Model.AccountAgeMonths <span class="fs-6 fw-normal text-secondary">Months</span>
                     </div>
-                    <div class="small text-secondary mt-1">Transactions: @Model.TotalTransactions (Min 10)</div>
+                    <div class="small text-secondary mt-1">Avg Bal: ৳@Model.AverageMonthlyBalance.ToString("N2")</div>
                 </div>
             </div>
         </div>
@@ -198,7 +211,7 @@
                         <i class="bi bi-info-circle"></i> Loan Policy Formula
                     </div>
                     <p class="text-light mb-0" style="font-size: 0.8rem; line-height: 1.5; opacity: 0.95;">
-                        Maximum Loan = <code class="text-info" style="background: rgba(14, 165, 233, 0.15); padding: 2px 6px; border-radius: 4px; font-weight: 600;">MIN(Avg Monthly Balance &times; 3, ৳500,000)</code>. Approval requires an active KYC account, minimum 6 months history, and score &ge; 65.
+                        Maximum Loan = <code class="text-info" style="background: rgba(14, 165, 233, 0.15); padding: 2px 6px; border-radius: 4px; font-weight: 600;">MIN(Avg Monthly Balance &times; 3, ৳500,000)</code>. Approval requires an active KYC account and score &ge; 65.
                     </p>
                 </div>
             </div>

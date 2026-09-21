@@ -1,0 +1,100 @@
+@model List<SmartBank.DTOs.Loans.LoanPaymentDto>
+@{
+    ViewData["Title"] = "Loan Payment Ledger";
+}
+
+<div class="container-fluid py-4 px-lg-4" style="max-width: 1400px;">
+    <!-- Top Nav -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary border-opacity-25">
+        <div>
+            <a asp-controller="Admin" asp-action="Loans" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to Loan Governance
+            </a>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print Ledger
+            </button>
+        </div>
+    </div>
+
+    <!-- Header Card -->
+    <div class="sb-card p-4 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div class="stat-icon-wrapper stat-icon-success" style="width: 52px; height: 52px; font-size: 1.4rem;">
+                <i class="bi bi-receipt-cutoff"></i>
+            </div>
+            <div>
+                <h3 class="fw-extrabold text-white mb-1">Loan Repayment Ledger</h3>
+                <p class="text-secondary small mb-0">System-wide transaction log of all loan installment payments and debt collections.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="sb-card p-0 overflow-hidden">
+        <div class="p-3 bg-dark border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold text-white mb-0">
+                <i class="bi bi-list-check text-primary me-2"></i> Payment Records (@(Model?.Count ?? 0))
+            </h6>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table sb-table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Payment Ref</th>
+                        <th>Application ID</th>
+                        <th>Payment Date</th>
+                        <th class="text-end">Amount Paid</th>
+                        <th>Method</th>
+                        <th>Recorded By</th>
+                        <th>Notes / Memo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="font-monospace text-info small fw-bold">@item.ReferenceNumber</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-dark border text-secondary font-monospace">Loan #@item.LoanApplicationId</span>
+                                </td>
+                                <td class="text-white small">
+                                    @item.PaymentDate.ToString("MMM dd, yyyy HH:mm") UTC
+                                </td>
+                                <td class="text-end font-monospace text-success fw-bold">
+                                    ৳@item.Amount.ToString("N2")
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
+                                        @item.Method
+                                    </span>
+                                </td>
+                                <td class="text-secondary small">
+                                    @item.RecordedBy
+                                </td>
+                                <td class="text-light small fst-italic">
+                                    @(item.Notes ?? "-")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+                                No payment records logged in the system yet.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,195 @@
+@model List<SmartBank.DTOs.Loans.LoanInstallmentDto>
+@{
+    var app = ViewBag.LoanApplication as SmartBank.DTOs.Loans.LoanApplicationDto;
+    ViewData["Title"] = $"Loan {app?.ApplicationNumber} Installment Schedule";
+}
+
+<div class="container-fluid py-4 px-lg-4" style="max-width: 1400px;">
+    <!-- Top Nav -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary border-opacity-25">
+        <div>
+            <a asp-controller="Admin" asp-action="Loans" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Back to Loan Governance
+            </a>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
+                <i class="bi bi-printer me-1"></i> Print Schedule
+            </button>
+        </div>
+    </div>
+
+    <!-- Loan Overview Header -->
+    <div class="sb-card p-4 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <span class="badge bg-dark border font-monospace text-info fs-6">@(app?.ApplicationNumber)</span>
+                <h3 class="fw-extrabold text-white mt-2 mb-1">Repayment Schedule &bull; @(app?.CustomerName)</h3>
+                <div class="small text-secondary">
+                    Account: <code class="text-info">@(app?.AccountNumber)</code> &bull; 
+                    Loan Type: <span class="text-white">@(app?.LoanType)</span> &bull;
+                    Interest Rate: <span class="text-info fw-bold">@(app?.FinalInterestRate?.ToString("F2") ?? "N/A")% p.a.</span>
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="small text-secondary">APPROVED CAPITAL</div>
+                <div class="fs-3 fw-extrabold text-success">৳@(app?.ApprovedAmount?.ToString("N2") ?? app?.RequestedAmount.ToString("N2"))</div>
+                <div class="small text-warning">Monthly EMI: ৳@(app?.FinalEmi?.ToString("N2") ?? "0.00")</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Installment Table -->
+    <div class="sb-card p-0 overflow-hidden">
+        <div class="p-3 bg-dark border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold text-white mb-0">
+                <i class="bi bi-calendar-range text-primary me-2"></i> Scheduled Monthly Installments (@(Model?.Count ?? 0))
+            </h6>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table sb-table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Due Date</th>
+                        <th class="text-end">Opening Balance</th>
+                        <th class="text-end">Principal</th>
+                        <th class="text-end">Interest</th>
+                        <th class="text-end">Total Due</th>
+                        <th class="text-end">Closing Balance</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Paid Amount</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td class="fw-bold font-monospace text-secondary">@item.InstallmentNumber</td>
+                                <td class="text-white small">@item.DueDate.ToString("MMM dd, yyyy")</td>
+                                <td class="text-end font-monospace text-secondary small">৳@item.OpeningBalance.ToString("N2")</td>
+                                <td class="text-end font-monospace text-info small">৳@item.PrincipalPortion.ToString("N2")</td>
+                                <td class="text-end font-monospace text-warning small">৳@item.InterestPortion.ToString("N2")</td>
+                                <td class="text-end font-monospace text-white fw-bold">৳@item.TotalDue.ToString("N2")</td>
+                                <td class="text-end font-monospace text-secondary small">৳@item.ClosingBalance.ToString("N2")</td>
+                                <td class="text-center">
+                                    @if (item.Status == "Paid")
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2-5 py-1">
+                                            <i class="bi bi-check2"></i> Paid
+                                        </span>
+                                    }
+                                    else if (item.Status == "Overdue")
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2-5 py-1">
+                                            <i class="bi bi-exclamation-octagon"></i> Overdue (+৳@item.LateFeeApplied.ToString("N2"))
+                                        </span>
+                                    }
+                                    else if (item.Status == "PartiallyPaid")
+                                    {
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-2-5 py-1">
+                                            Partial
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2-5 py-1">
+                                            Pending
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end font-monospace small">
+                                    @if (item.PaidAmount > 0)
+                                    {
+                                        <span class="text-success fw-bold">৳@item.PaidAmount.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary">-</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (item.Status != "Paid")
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2" data-bs-toggle="modal" data-bs-target="#payModal-@item.Id">
+                                            <i class="bi bi-cash me-1"></i> Record Pay
+                                        </button>
+
+                                        <!-- Record Payment Modal -->
+                                        <div class="modal fade" id="payModal-@item.Id" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content bg-dark border-secondary text-start">
+                                                    <div class="modal-header border-secondary">
+                                                        <h5 class="modal-title text-white">
+                                                            <i class="bi bi-cash-stack text-success me-2"></i> Record Repayment: Inst #@item.InstallmentNumber
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <form asp-controller="Admin" asp-action="RecordPayment" method="post">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="LoanApplicationId" value="@(app?.Id ?? item.LoanApplicationId)" />
+                                                        <input type="hidden" name="InstallmentId" value="@item.Id" />
+                                                        <div class="modal-body">
+                                                            <div class="p-3 rounded-3 bg-black bg-opacity-40 border border-secondary mb-3">
+                                                                <div class="d-flex justify-content-between text-muted small">
+                                                                    <span>Installment Due:</span>
+                                                                    <strong class="text-white">৳@item.TotalDue.ToString("N2")</strong>
+                                                                </div>
+                                                                @if (item.LateFeeApplied > 0)
+                                                                {
+                                                                    <div class="d-flex justify-content-between text-muted small mt-1">
+                                                                        <span>Late Fee:</span>
+                                                                        <strong class="text-danger">+৳@item.LateFeeApplied.ToString("N2")</strong>
+                                                                    </div>
+                                                                }
+                                                                <div class="d-flex justify-content-between text-muted small mt-1 pt-1 border-top border-secondary">
+                                                                    <span>Remaining Due:</span>
+                                                                    <strong class="text-success fs-6">৳@item.RemainingDue.ToString("N2")</strong>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label text-white small fw-bold">PAYMENT AMOUNT (৳)</label>
+                                                                <input type="number" name="Amount" step="0.01" min="1" max="1000000" value="@item.RemainingDue" class="form-control bg-dark text-white border-secondary" required />
+                                                            </div>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label text-white small fw-bold">PAYMENT METHOD</label>
+                                                                <select name="Method" class="form-select bg-dark text-white border-secondary">
+                                                                    <option value="AccountDebit">Account Direct Debit</option>
+                                                                    <option value="Cash">Cash Over-the-Counter</option>
+                                                                    <option value="BankTransfer">Bank Transfer</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label text-white small fw-bold">TRANSACTION NOTES / REF</label>
+                                                                <input type="text" name="Notes" class="form-control bg-dark text-white border-secondary" placeholder="Over-the-counter settlement..." />
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer border-secondary">
+                                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">Confirm Repayment</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary small fst-italic">Complete</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

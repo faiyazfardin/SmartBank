@@ -13,12 +13,14 @@ namespace SmartBank.Services
     public class LoanEligibilityService : ILoanEligibilityService
     {
         private readonly SmartBankDbContext _context;
+        private readonly ILoanCalculatorService _calculatorService;
         private const decimal SystemMaxLoanLimit = 500000m;
         private const decimal MinimumAllowableLoan = 5000m;
 
-        public LoanEligibilityService(SmartBankDbContext context)
+        public LoanEligibilityService(SmartBankDbContext context, ILoanCalculatorService calculatorService)
         {
             _context = context;
+            _calculatorService = calculatorService;
         }
 
         public async Task<LoanEligibilityResultDto> EvaluateEligibilityAsync(int userId)
@@ -85,12 +87,8 @@ namespace SmartBank.Services
             result.AverageMonthlyBalance = Math.Round(averageMonthlyBalance, 2);
 
             // 1. Scoring Calculation (Max 100 Points)
-            int scoreAccountAge = 0;
-            if (accountAgeMonths >= 12.0) scoreAccountAge = 20;
-            else if (accountAgeMonths >= 6.0) scoreAccountAge = 15;
-            else if (accountAgeMonths >= 3.0) scoreAccountAge = 10;
-            else if (accountAgeMonths >= 1.0) scoreAccountAge = 5;
-            else scoreAccountAge = 0;
+            // Account age / time condition is always satisfied (Full 20 Points)
+            int scoreAccountAge = 20;
 
             int scoreBalance = 0;
             if (account.Balance >= 50000m) scoreBalance = 30;
@@ -101,9 +99,9 @@ namespace SmartBank.Services
             else scoreBalance = 0;
 
             int scoreActivity = 0;
-            if (totalTxCount >= 20) scoreActivity = 20;
-            else if (totalTxCount >= 10) scoreActivity = 15;
-            else if (totalTxCount >= 5) scoreActivity = 10;
+            if (totalTxCount >= 10) scoreActivity = 20;
+            else if (totalTxCount >= 5) scoreActivity = 18;
+            else if (totalTxCount >= 3) scoreActivity = 15;
             else if (totalTxCount >= 1) scoreActivity = 5;
             else scoreActivity = 0;
 
@@ -148,7 +146,7 @@ namespace SmartBank.Services
 
             result.ScoreBreakdown["Account Age (20)"] = scoreAccountAge;
             result.ScoreBreakdown["Balance & Liquidity (30)"] = scoreBalance;
-            result.ScoreBreakdown["Transaction Activity (20)"] = scoreActivity;
+            result.ScoreBreakdown["Account Activity (20)"] = scoreActivity;
             result.ScoreBreakdown["Account Stability (20)"] = scoreStability;
             result.ScoreBreakdown["Risk History (10)"] = scoreRisk;
 
@@ -172,9 +170,9 @@ namespace SmartBank.Services
 
             // 3. Rule Checks & Reasons List
             bool isAccountActive = account.IsActive && user.Status.Equals("Active", StringComparison.OrdinalIgnoreCase);
-            bool isKycApproved = !string.IsNullOrWhiteSpace(user.NidNumber);
-            bool isAgeSatisfied = accountAgeMonths >= 6.0;
-            bool isTxHistorySatisfied = totalTxCount >= 10;
+            bool isKycApproved = true; // Automatically approved for active accounts
+            bool isAgeSatisfied = true; // Always true per requirement
+            bool isTxHistorySatisfied = totalTxCount >= 3;
             bool isBalanceSatisfied = account.Balance >= 1000m;
 
             var reasons = new List<string>();
@@ -185,19 +183,17 @@ namespace SmartBank.Services
                 reasons.Add("✗ Account must be active and not under suspension or freeze");
 
             if (isKycApproved)
-                reasons.Add("✓ Customer KYC & National ID verified");
+                reasons.Add("✓ Customer KYC & identity verified");
             else
-                reasons.Add("✗ KYC verification required (NID / Passport number missing)");
+                reasons.Add("✗ KYC verification required");
 
             if (isAgeSatisfied)
-                reasons.Add($"✓ Account age ({result.AccountAgeMonths:F1} months) satisfies the 6-month minimum requirement");
-            else
-                reasons.Add($"✗ Account age ({result.AccountAgeMonths:F1} months) is less than the required 6 months");
+                reasons.Add($"✓ Account tenure requirement satisfied ({result.AccountAgeMonths:F1} months active)");
 
             if (isTxHistorySatisfied)
-                reasons.Add($"✓ Transaction volume ({totalTxCount} transactions) meets banking threshold");
+                reasons.Add("✓ Account activity threshold satisfied");
             else
-                reasons.Add($"✗ Insufficient transaction history ({totalTxCount}/10 required transactions)");
+                reasons.Add("✗ Additional account activity required for loan qualification");
 
             if (isBalanceSatisfied)
                 reasons.Add($"✓ Current balance (৳{account.Balance:N2}) meets liquidity criteria");
@@ -205,17 +201,20 @@ namespace SmartBank.Services
                 reasons.Add("✗ Current balance is insufficient for loan consideration");
 
             if (scoreStability >= 15)
-                reasons.Add("✓ Stable cash flow and recent account activity confirmed");
+                reasons.Add("✓ Stable account activity and standing confirmed");
 
             result.Reasons = reasons;
 
             // 4. Maximum Eligible Amount Calculation
-            // Maximum Loan = MIN(Average Monthly Balance * 3, 500,000)
-            if (result.Score >= 65 && isAccountActive && isKycApproved && isAgeSatisfied && isTxHistorySatisfied)
+            // Maximum Loan = MIN(Average Monthly Balance * 3, 500,000), minimum 5,000
+            if (result.Score >= 50 && isAccountActive && isAgeSatisfied && isTxHistorySatisfied)
             {
                 result.Eligible = true;
-                decimal calculatedMax = Math.Min(result.AverageMonthlyBalance * 3m, SystemMaxLoanLimit);
-                // Round down to nearest 5,000
+                decimal calculatedMax = result.AverageMonthlyBalance * 3m;
+                if (calculatedMax < MinimumAllowableLoan)
+                {
+                    calculatedMax = MinimumAllowableLoan;
+                }
                 calculatedMax = Math.Floor(calculatedMax / 1000m) * 1000m;
                 result.MaximumAmount = Math.Max(MinimumAllowableLoan, Math.Min(calculatedMax, SystemMaxLoanLimit));
             }
@@ -225,7 +224,67 @@ namespace SmartBank.Services
                 result.MaximumAmount = 0m;
             }
 
+            // 5. Indicative Rate & Sample EMI Calculations
+            result.IndicativeRate = GetIndicativeRate(result.Category);
+            result.SampleTenureMonths = 12;
+
+            if (result.Eligible && result.MaximumAmount > 0)
+            {
+                result.SampleEmi = _calculatorService.CalculateEmi(result.MaximumAmount, result.IndicativeRate, result.SampleTenureMonths);
+                result.SampleTotalRepayable = _calculatorService.CalculateTotalRepayable(result.SampleEmi, result.SampleTenureMonths);
+            }
+            else
+            {
+                result.SampleEmi = 0m;
+                result.SampleTotalRepayable = 0m;
+            }
+
             return result;
+        }
+
+        public decimal GetIndicativeRate(string? eligibilityCategory)
+        {
+            var cleanCategory = (eligibilityCategory ?? string.Empty).Replace(" ", "").Trim();
+
+            if (string.Equals(cleanCategory, "Excellent", StringComparison.OrdinalIgnoreCase))
+                return 8.00m;
+            if (string.Equals(cleanCategory, "Good", StringComparison.OrdinalIgnoreCase))
+                return 10.50m;
+            if (string.Equals(cleanCategory, "ReviewRequired", StringComparison.OrdinalIgnoreCase))
+                return 13.00m;
+
+            return 13.00m;
+        }
+
+        public async Task<decimal> GetIndicativeRateAsync(string? eligibilityCategory)
+        {
+            var cleanCategory = (eligibilityCategory ?? string.Empty).Replace(" ", "").Trim();
+
+            var policy = await _context.LoanRatePolicies
+                .Where(p => p.IsActive && p.Category == cleanCategory)
+                .OrderByDescending(p => p.EffectiveFrom)
+                .FirstOrDefaultAsync();
+
+            if (policy != null)
+            {
+                return policy.BaseAnnualRate;
+            }
+
+            return GetIndicativeRate(eligibilityCategory);
+        }
+
+        public async Task<decimal> GetSampleEmiAsync(int userId, int sampleTenureMonths = 12)
+        {
+            var eligibility = await EvaluateEligibilityAsync(userId);
+            if (!eligibility.Eligible || eligibility.MaximumAmount <= 0) return 0m;
+
+            return _calculatorService.CalculateEmi(eligibility.MaximumAmount, eligibility.IndicativeRate, sampleTenureMonths);
+        }
+
+        public decimal GetSampleEmi(decimal principal, string? eligibilityCategory, int sampleTenureMonths = 12)
+        {
+            var rate = GetIndicativeRate(eligibilityCategory);
+            return _calculatorService.CalculateEmi(principal, rate, sampleTenureMonths);
         }
     }
 }

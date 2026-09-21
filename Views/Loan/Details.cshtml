@@ -1,130 +1,260 @@
-@model SmartBank.DTOs.Loans.LoanApplicationDto
+@model SmartBank.DTOs.Loans.LoanDetailsDto
 @{
-    ViewData["Title"] = $"Loan Application {Model.ApplicationNumber}";
+    var app = Model.Application;
+    ViewData["Title"] = $"Loan {app.ApplicationNumber} Details";
     var isAdmin = User.IsInRole("Admin");
 }
 
-<div class="container py-4" style="max-width: 760px;">
+<div class="container py-4" style="max-width: 950px;">
     <!-- Top Back Link -->
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
         <a asp-controller="@(isAdmin ? "Admin" : "Loan")" asp-action="@(isAdmin ? "Loans" : "MyApplications")" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
-            <i class="bi bi-arrow-left me-1"></i> Back to @(isAdmin ? "Admin Loan Manager" : "My Applications")
+            <i class="bi bi-arrow-left me-1"></i> Back to @(isAdmin ? "Admin Loans" : "My Applications")
         </a>
         <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="window.print()">
-            <i class="bi bi-printer me-1"></i> Print Receipt
+            <i class="bi bi-printer me-1"></i> Print Summary
         </button>
     </div>
 
-    <!-- Official Loan Application Receipt Card -->
-    <div class="sb-card p-4 p-md-5 position-relative overflow-hidden">
-        <!-- Watermark / Status Badge -->
-        <div class="d-flex justify-content-between align-items-start pb-4 border-bottom mb-4">
+    <!-- Main Loan Summary Card -->
+    <div class="sb-card p-4 p-md-5 mb-4 position-relative overflow-hidden">
+        <div class="d-flex flex-wrap justify-content-between align-items-start pb-4 border-bottom border-secondary border-opacity-25 gap-3">
             <div>
-                <span class="fs-4 fw-bold text-white">Smart<span class="text-info">Bank</span></span>
-                <div class="small text-muted">Official Credit & Loan Application Summary</div>
+                <span class="fs-4 fw-bold text-white">Smart<span class="text-info">Bank</span> Loan Portfolio</span>
+                <div class="small text-secondary">Application Ref: <strong class="font-monospace text-info">@app.ApplicationNumber</strong></div>
             </div>
-            <div class="text-end">
-                @if (Model.Status == "Approved")
+            <div class="d-flex gap-2 align-items-center">
+                @if (app.Status == "Approved" || app.Status == "Disbursed")
                 {
-                    <span class="badge bg-success border border-success-subtle rounded-pill px-3 py-2 fs-6">
-                        <i class="bi bi-check-circle-fill me-1"></i> APPROVED
+                    <span class="badge rounded-pill px-3 py-2 fs-6 fw-bold" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.6); color: #34d399;">
+                        <i class="bi bi-check-circle-fill me-1"></i> ACTIVE LOAN
                     </span>
                 }
-                else if (Model.Status == "Rejected")
+                else if (app.Status == "Closed")
                 {
-                    <span class="badge bg-danger border border-danger-subtle rounded-pill px-3 py-2 fs-6">
+                    <span class="badge rounded-pill px-3 py-2 fs-6 fw-bold" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.6); color: #60a5fa;">
+                        <i class="bi bi-patch-check-fill me-1"></i> CLOSED &amp; PAID OFF
+                    </span>
+                }
+                else if (app.Status == "Rejected")
+                {
+                    <span class="badge rounded-pill px-3 py-2 fs-6 fw-bold" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.6); color: #f87171;">
                         <i class="bi bi-x-circle-fill me-1"></i> REJECTED
                     </span>
                 }
                 else
                 {
-                    <span class="badge bg-warning text-dark border border-warning rounded-pill px-3 py-2 fs-6">
-                        <i class="bi bi-hourglass-split me-1"></i> PENDING REVIEW
+                    <span class="badge rounded-pill px-3 py-2 fs-6 fw-bold bg-warning text-dark border border-warning">
+                        <i class="bi bi-hourglass-split me-1"></i> UNDER REVIEW
                     </span>
                 }
             </div>
         </div>
 
-        <!-- Application Header Box -->
-        <div class="text-center my-3 pb-3 border-bottom">
-            <div class="text-muted small fw-semibold text-uppercase tracking-wider">REQUESTED FINANCING</div>
-            <div class="display-4 fw-extrabold text-success mt-1 mb-2">
-                ৳@Model.RequestedAmount.ToString("N2")
+        <!-- Loan Financial Metrics Grid -->
+        <div class="row g-3 py-4 border-bottom border-secondary border-opacity-25">
+            <div class="col-md-3 col-6">
+                <div class="text-secondary small fw-semibold text-uppercase">Approved Capital</div>
+                <div class="fs-4 fw-extrabold text-success mt-1">
+                    ৳@(app.ApprovedAmount?.ToString("N2") ?? app.RequestedAmount.ToString("N2"))
+                </div>
+                <div class="small text-secondary">Req: ৳@app.RequestedAmount.ToString("N2")</div>
             </div>
-            <div class="d-flex justify-content-center align-items-center gap-2">
-                <span class="badge bg-dark border font-monospace text-info px-3 py-1">@Model.ApplicationNumber</span>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1">@Model.LoanType Loan</span>
+
+            <div class="col-md-3 col-6">
+                <div class="text-secondary small fw-semibold text-uppercase">Interest Rate</div>
+                <div class="fs-4 fw-extrabold text-info mt-1">
+                    @(app.FinalInterestRate?.ToString("F2") ?? app.IndicativeRate?.ToString("F2") ?? "N/A")%
+                </div>
+                <div class="small text-secondary">Reducing Balance</div>
+            </div>
+
+            <div class="col-md-3 col-6">
+                <div class="text-secondary small fw-semibold text-uppercase">Monthly EMI</div>
+                <div class="fs-4 fw-extrabold text-warning mt-1">
+                    ৳@(app.FinalEmi?.ToString("N2") ?? "Pending")
+                </div>
+                <div class="small text-secondary">Tenure: @(app.FinalTenureMonths ?? app.RequestedTenureMonths ?? 12) mo</div>
+            </div>
+
+            <div class="col-md-3 col-6">
+                <div class="text-secondary small fw-semibold text-uppercase">Remaining Balance</div>
+                <div class="fs-4 fw-extrabold text-white mt-1">
+                    ৳@Model.TotalRemaining.ToString("N2")
+                </div>
+                <div class="small text-secondary">Paid: ৳@Model.TotalPaid.ToString("N2")</div>
             </div>
         </div>
 
-        <!-- Key Information Grid -->
+        <!-- Applicant & Account Overview -->
         <div class="row g-3 py-3">
-            <div class="col-6">
-                <div class="text-muted small">Applicant Name</div>
-                <div class="fw-bold text-white">@Model.CustomerName</div>
+            <div class="col-md-4 col-6">
+                <div class="text-secondary small">Customer Name</div>
+                <div class="fw-bold text-white">@app.CustomerName</div>
             </div>
-            <div class="col-6 text-end">
-                <div class="text-muted small">Beneficiary Account</div>
-                <div class="fw-bold font-monospace text-info">@Model.AccountNumber</div>
+            <div class="col-md-4 col-6">
+                <div class="text-secondary small">Disbursed Account</div>
+                <div class="fw-bold font-monospace text-info">@app.AccountNumber</div>
             </div>
-
-            <div class="col-6">
-                <div class="text-muted small">Applicant Contact</div>
-                <div class="text-light small">@Model.CustomerEmail <br />@Model.CustomerPhone</div>
+            <div class="col-md-4 col-12">
+                <div class="text-secondary small">Application Date</div>
+                <div class="text-light small">@app.CreatedAt.ToString("MMM dd, yyyy HH:mm") UTC</div>
             </div>
-            <div class="col-6 text-end">
-                <div class="text-muted small">Application Date</div>
-                <div class="text-light small">@Model.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss") UTC</div>
-            </div>
-
-            <div class="col-6">
-                <div class="text-muted small">Eligibility Score</div>
-                <div class="fw-bold text-info">@Model.EligibilityScore / 100 (@Model.EligibilityCategory)</div>
-            </div>
-            <div class="col-6 text-end">
-                <div class="text-muted small">Eligible Credit Cap</div>
-                <div class="fw-bold text-success">৳@Model.EligibleAmount.ToString("N2")</div>
-            </div>
-
-            @if (Model.MonthlyIncome.HasValue)
-            {
-                <div class="col-12">
-                    <div class="text-muted small">Declared Monthly Income</div>
-                    <div class="fw-bold text-white">৳@Model.MonthlyIncome.Value.ToString("N2")</div>
-                </div>
-            }
-
             <div class="col-12">
-                <div class="text-muted small">Loan Purpose</div>
-                <div class="p-3 rounded-3 bg-dark border border-secondary text-light mt-1 small">
-                    @Model.Purpose
+                <div class="text-secondary small">Stated Loan Purpose</div>
+                <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-50 text-light small mt-1">
+                    @app.Purpose
                 </div>
             </div>
         </div>
 
-        <!-- Admin Decision & Notes Block -->
-        @if (Model.ReviewedAt.HasValue || !string.IsNullOrWhiteSpace(Model.AdminNote))
+        @if (!string.IsNullOrWhiteSpace(app.AdminNote))
         {
-            <div class="mt-4 p-4 rounded-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
-                <h6 class="fw-bold text-white mb-2 d-flex align-items-center gap-2">
-                    <i class="bi bi-shield-check text-warning"></i> Bank Credit Review Decision
-                </h6>
-                <div class="small text-muted mb-2">
-                    Reviewed By: <span class="text-white fw-semibold">@(Model.ReviewedBy ?? "Bank Underwriting Team")</span> • 
-                    Date: <span class="text-white fw-semibold">@Model.ReviewedAt?.ToString("MMM dd, yyyy HH:mm") UTC</span>
+            <div class="p-3 rounded-3 mt-2" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);">
+                <div class="small text-warning fw-bold mb-1"><i class="bi bi-chat-quote-fill me-1"></i> Underwriter Note:</div>
+                <div class="small text-light">@app.AdminNote</div>
+            </div>
+        }
+    </div>
+
+    <!-- Installments Repayment Schedule -->
+    @if (Model.Installments != null && Model.Installments.Any())
+    {
+        <div class="sb-card p-4 p-md-5 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="fw-extrabold text-white mb-1"><i class="bi bi-calendar-range text-primary me-2"></i>Repayment Schedule</h4>
+                    <p class="text-secondary small mb-0">Immutable monthly installments generated per Reducing Balance formula.</p>
                 </div>
-                @if (!string.IsNullOrWhiteSpace(Model.AdminNote))
+                <span class="badge bg-dark border border-secondary text-secondary px-3 py-2 font-monospace small">
+                    @Model.Installments.Count Installments
+                </span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                    <thead>
+                        <tr class="text-secondary small text-uppercase" style="border-bottom: 2px solid rgba(255,255,255,0.1);">
+                            <th class="py-3">#</th>
+                            <th class="py-3">Due Date</th>
+                            <th class="py-3 text-end">Opening</th>
+                            <th class="py-3 text-end">Principal</th>
+                            <th class="py-3 text-end">Interest</th>
+                            <th class="py-3 text-end">Total Due</th>
+                            <th class="py-3 text-end">Closing</th>
+                            <th class="py-3 text-center">Status</th>
+                            <th class="py-3 text-end">Paid Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Installments)
+                        {
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td class="fw-bold font-monospace text-secondary">@item.InstallmentNumber</td>
+                                <td class="small text-light">@item.DueDate.ToString("MMM dd, yyyy")</td>
+                                <td class="text-end font-monospace text-secondary small">৳@item.OpeningBalance.ToString("N2")</td>
+                                <td class="text-end font-monospace text-info small">৳@item.PrincipalPortion.ToString("N2")</td>
+                                <td class="text-end font-monospace text-warning small">৳@item.InterestPortion.ToString("N2")</td>
+                                <td class="text-end font-monospace text-white fw-bold">৳@item.TotalDue.ToString("N2")</td>
+                                <td class="text-end font-monospace text-secondary small">৳@item.ClosingBalance.ToString("N2")</td>
+                                <td class="text-center">
+                                    @if (item.Status == "Paid")
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2-5 py-1 small">
+                                            <i class="bi bi-check2"></i> Paid
+                                        </span>
+                                    }
+                                    else if (item.Status == "Overdue")
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2-5 py-1 small">
+                                            <i class="bi bi-exclamation-circle"></i> Overdue
+                                        </span>
+                                    }
+                                    else if (item.Status == "PartiallyPaid")
+                                    {
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-2-5 py-1 small">
+                                            Partial
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2-5 py-1 small">
+                                            Pending
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end font-monospace small">
+                                    @if (item.PaidAmount > 0)
+                                    {
+                                        <span class="text-success fw-bold">৳@item.PaidAmount.ToString("N2")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary">-</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Payment History -->
+    @if (Model.Payments != null && Model.Payments.Any())
+    {
+        <div class="sb-card p-4 p-md-5 mb-4">
+            <h4 class="fw-extrabold text-white mb-3"><i class="bi bi-receipt text-success me-2"></i>Recorded Repayments</h4>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                    <thead>
+                        <tr class="text-secondary small text-uppercase" style="border-bottom: 2px solid rgba(255,255,255,0.1);">
+                            <th class="py-3">Reference</th>
+                            <th class="py-3">Date</th>
+                            <th class="py-3 text-end">Amount Paid</th>
+                            <th class="py-3">Method</th>
+                            <th class="py-3">Recorded By</th>
+                            <th class="py-3">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Payments)
+                        {
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td class="font-monospace text-info small">@p.ReferenceNumber</td>
+                                <td class="small text-light">@p.PaymentDate.ToString("MMM dd, yyyy HH:mm") UTC</td>
+                                <td class="text-end font-monospace text-success fw-bold">৳@p.Amount.ToString("N2")</td>
+                                <td class="small text-secondary">@p.Method</td>
+                                <td class="small text-secondary">@p.RecordedBy</td>
+                                <td class="small text-light fst-italic">@(p.Notes ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- Audit Log -->
+    @if (Model.AuditLogs != null && Model.AuditLogs.Any())
+    {
+        <div class="sb-card p-4 p-md-5">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-shield-shaded text-info me-2"></i>Application Audit Trail</h5>
+            <div class="d-flex flex-column gap-2">
+                @foreach (var log in Model.AuditLogs)
                 {
-                    <div class="p-2 rounded bg-dark border border-secondary text-light small fst-italic">
-                        "@Model.AdminNote"
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-white small">@log.Action <span class="text-secondary fw-normal">by @log.PerformedBy</span></div>
+                            <div class="text-secondary small">@(log.Note ?? "No notes attached")</div>
+                        </div>
+                        <div class="text-end text-secondary small font-monospace">
+                            @log.PerformedAt.ToString("MMM dd, yyyy HH:mm") UTC
+                        </div>
                     </div>
                 }
             </div>
-        }
-
-        <!-- Simulation Note -->
-        <div class="mt-4 pt-3 border-top text-center text-muted small" style="font-size: 0.72rem;">
-            SmartBank Simulation Lending Engine &bull; Transaction Timestamp: @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") UTC &bull; ACID Ledger Secured
         </div>
-    </div>
+    }
 </div>

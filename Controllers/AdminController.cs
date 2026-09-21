@@ -120,11 +120,21 @@ namespace SmartBank.Controllers
             var user = await _context.Users.Include(u => u.Accounts).FirstOrDefaultAsync(u => u.Id == userId);
             if (user != null)
             {
-                var plainPassword = PasswordGeneratorHelper.GenerateSecurePassword(10);
-                user.PasswordHash = SmartBank.Security.PasswordHasher.HashPassword(plainPassword);
+                var accountPassword = PasswordGeneratorHelper.GenerateStrongPassword(10);
+                var vaultPassword = PasswordGeneratorHelper.GenerateStrongPassword(10);
+                while (vaultPassword == accountPassword)
+                {
+                    vaultPassword = PasswordGeneratorHelper.GenerateStrongPassword(10);
+                }
 
-                user.Status = "Active";
+                user.PasswordHash = SmartBank.Security.PasswordHasher.HashPassword(accountPassword);
+                user.VaultPasswordHash = SmartBank.Security.PasswordHasher.HashPassword(vaultPassword);
+                user.VaultPasswordSetAt = DateTime.UtcNow;
+                user.IsFirstLogin = true;
                 user.MustChangePasswordOnNextLogin = true;
+                user.FailedVaultAttempts = 0;
+                user.VaultLockedUntil = null;
+                user.Status = "Active";
                 user.TemporaryPasswordIssuedAtUtc = DateTime.UtcNow;
                 user.UpdatedAt = DateTime.UtcNow;
 
@@ -136,16 +146,16 @@ namespace SmartBank.Controllers
 
                 await _context.SaveChangesAsync();
 
-                bool emailSent = await _welcomeEmailService.SendWelcomeEmailAsync(user.Email, user.FullName, user.Username, plainPassword);
+                bool emailSent = await _welcomeEmailService.SendWelcomeEmailAsync(user.Email, user.FullName, user.Username, accountPassword, vaultPassword);
 
                 if (emailSent)
                 {
-                    TempData["SuccessToast"] = $"User approved. Welcome email sent to {user.Email}.";
+                    TempData["SuccessToast"] = $"User approved successfully! Dual credentials email (Account + Vault passwords) dispatched to {user.Email}.";
                 }
                 else
                 {
-                    _logger.LogWarning("[ADMIN APPROVAL] Failed to send welcome email to {Email}. Plain Password: {Password}", user.Email, plainPassword);
-                    TempData["ErrorToast"] = $"Email failed. Manually send this password: {plainPassword}";
+                    _logger.LogWarning("[ADMIN APPROVAL] Failed to send welcome email to {Email}. Account Pass: {AccountPass}, Vault Pass: {VaultPass}", user.Email, accountPassword, vaultPassword);
+                    TempData["ErrorToast"] = $"Email delivery failed. Manually provide — Account: {accountPassword} | Vault: {vaultPassword}";
                 }
             }
             else
@@ -624,11 +634,6 @@ namespace SmartBank.Controllers
                     account.AccountNumber = newAcc;
                 }
 
-                if (balance.HasValue && balance.Value >= 0)
-                {
-                    account.Balance = balance.Value;
-                }
-
                 if (isActive.HasValue)
                 {
                     account.IsActive = isActive.Value;
@@ -642,6 +647,63 @@ namespace SmartBank.Controllers
 
             TempData["SuccessToast"] = $"User details for {user.FullName} (@{user.Username}) updated successfully.";
             return RedirectToAction("Users");
+        }
+
+        // GET: Admin/GetUserDetails?userId=123
+        [HttpGet]
+        public async Task<IActionResult> GetUserDetails(int userId)
+        {
+            var user = await _context.Users
+                .Include(u => u.Accounts)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return Json(new { success = false, message = "User not found." });
+            }
+
+            var account = user.Accounts.FirstOrDefault();
+            var txList = new List<object>();
+
+            if (account != null)
+            {
+                var transactions = await _context.Transactions
+                    .Where(t => t.AccountId == account.Id)
+                    .OrderByDescending(t => t.Timestamp)
+                    .ToListAsync();
+
+                txList = transactions.Select(t => (object)new
+                {
+                    id = t.Id,
+                    type = t.Type.ToString(),
+                    amount = t.Amount,
+                    timestamp = t.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                    relatedAccountId = t.RelatedAccountId,
+                    isCredit = t.Type == TransactionType.Deposit || t.Type == TransactionType.TransferIn
+                }).ToList();
+            }
+
+            return Json(new
+            {
+                success = true,
+                user = new
+                {
+                    id = user.Id,
+                    fullName = user.FullName,
+                    username = user.Username,
+                    email = user.Email,
+                    phoneNumber = user.PhoneNumber ?? "Not provided",
+                    nidNumber = user.NidNumber ?? "Not provided",
+                    role = user.Role,
+                    status = user.Status,
+                    createdAt = user.CreatedAt.ToString("MMM dd, yyyy hh:mm tt") + " UTC",
+                    accountNumber = account?.AccountNumber ?? "No Account Provisioned",
+                    accountId = account?.Id ?? 0,
+                    balance = account?.Balance ?? 0m,
+                    isActive = account?.IsActive ?? false
+                },
+                transactions = txList
+            });
         }
 
         // POST: Admin/AdminDepositFunds
@@ -737,14 +799,35 @@ namespace SmartBank.Controllers
         // POST: Admin/ApproveLoan
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ApproveLoan(string applicationNumber, string comment)
+        public async Task<IActionResult> ApproveLoan(
+            string applicationNumber, 
+            decimal? approvedAmount, 
+            decimal? interestRate, 
+            int? tenureMonths, 
+            string? comment)
         {
             var adminUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Administrator";
-            var (status, response) = await _loanService.ReviewApplicationAsync(applicationNumber, adminUsername, isApprove: true, comment ?? "Approved after banking criteria review.");
+            
+            var app = await _loanService.GetApplicationByNumberAsync(0, applicationNumber, isAdmin: true);
+            if (app == null)
+            {
+                TempData["ErrorToast"] = "Loan application not found.";
+                return RedirectToAction("Loans");
+            }
+
+            var dto = new ApproveLoanDto
+            {
+                ApprovedAmount = approvedAmount ?? app.RequestedAmount,
+                InterestRate = interestRate ?? app.IndicativeRate ?? 10.50m,
+                TenureMonths = tenureMonths ?? app.RequestedTenureMonths ?? 12,
+                AdminNote = comment ?? "Approved after banking underwriting review."
+            };
+
+            var (status, response) = await _loanService.ApproveLoanAsync(app.Id, dto, adminUsername);
 
             if (status == 200)
             {
-                TempData["SuccessToast"] = $"Loan Application {applicationNumber} has been approved successfully.";
+                TempData["SuccessToast"] = $"Loan {applicationNumber} successfully approved! ৳{dto.ApprovedAmount:N2} disbursed and repayment schedule activated.";
             }
             else
             {
@@ -757,10 +840,17 @@ namespace SmartBank.Controllers
         // POST: Admin/RejectLoan
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RejectLoan(string applicationNumber, string comment)
+        public async Task<IActionResult> RejectLoan(string applicationNumber, string? comment)
         {
             var adminUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Administrator";
-            var (status, response) = await _loanService.ReviewApplicationAsync(applicationNumber, adminUsername, isApprove: false, comment ?? "Rejected per loan risk policy.");
+            var app = await _loanService.GetApplicationByNumberAsync(0, applicationNumber, isAdmin: true);
+            if (app == null)
+            {
+                TempData["ErrorToast"] = "Loan application not found.";
+                return RedirectToAction("Loans");
+            }
+
+            var (status, response) = await _loanService.RejectLoanAsync(app.Id, comment ?? "Application rejected per risk guidelines.", adminUsername);
 
             if (status == 200)
             {
@@ -770,6 +860,65 @@ namespace SmartBank.Controllers
             {
                 TempData["ErrorToast"] = response.Message ?? "Failed to reject loan application.";
             }
+
+            return RedirectToAction("Loans");
+        }
+
+        // GET: Admin/LoanSchedule/{applicationId}
+        [HttpGet]
+        public async Task<IActionResult> LoanSchedule(int id)
+        {
+            var installments = await _loanService.GetInstallmentsAsync(id);
+            var apps = await _loanService.GetAllApplicationsForAdminAsync();
+            var app = apps.FirstOrDefault(a => a.Id == id);
+
+            if (app == null)
+            {
+                TempData["ErrorToast"] = "Loan application not found.";
+                return RedirectToAction("Loans");
+            }
+
+            ViewBag.LoanApplication = app;
+            return View(installments);
+        }
+
+        // GET: Admin/LoanPayments
+        [HttpGet]
+        public async Task<IActionResult> LoanPayments()
+        {
+            var payments = await _loanService.GetAllPaymentsForAdminAsync();
+            return View(payments);
+        }
+
+        // POST: Admin/RecordPayment
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordPayment(RecordPaymentDto dto)
+        {
+            var adminUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? User.Identity?.Name ?? "Administrator";
+            var (status, response) = await _loanService.RecordPaymentAsync(dto, adminUsername);
+
+            if (status == 200)
+            {
+                TempData["SuccessToast"] = $"Payment of ৳{dto.Amount:N2} recorded successfully.";
+            }
+            else
+            {
+                TempData["ErrorToast"] = response.Message ?? "Failed to record payment.";
+            }
+
+            return RedirectToAction("Loans");
+        }
+
+        // POST: Admin/MarkOverdue
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkOverdue()
+        {
+            var count = await _loanService.MarkOverdueInstallmentsAsync();
+            TempData["InfoToast"] = count > 0 
+                ? $"Overdue scan completed: {count} installment(s) marked overdue and late fees applied." 
+                : "Overdue scan completed: No pending past-due installments found.";
 
             return RedirectToAction("Loans");
         }
