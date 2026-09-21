@@ -117,6 +117,12 @@ namespace SmartBank.Controllers
             }
 
             // Check Account Status FIRST before sending OTP or allowing login
+            if (dbUser.LockedUntil.HasValue && dbUser.LockedUntil.Value > DateTime.UtcNow)
+            {
+                ViewBag.Error = $"Your account has been locked/suspended by Administrator until {dbUser.LockedUntil.Value:MMM dd, yyyy HH:mm} UTC. Login access is prohibited.";
+                return View();
+            }
+
             if (!string.Equals(dbUser.Status, "Active", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.Equals(dbUser.Status, "Pending", StringComparison.OrdinalIgnoreCase))
