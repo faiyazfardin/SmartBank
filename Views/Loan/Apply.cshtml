@@ -5,138 +5,209 @@
     var account = ViewBag.Account as SmartBank.Entities.Account;
     var user = ViewBag.User as SmartBank.Entities.User;
     var maxAmount = eligibility?.MaximumAmount ?? 0m;
+    var indicativeRate = eligibility?.IndicativeRate ?? 10.50m;
 }
 
-<div class="container py-4" style="max-width: 800px;">
+<div class="container py-4" style="max-width: 950px;">
     <!-- Top Breadcrumb -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <a asp-controller="Loan" asp-action="Eligibility" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
             <i class="bi bi-arrow-left me-1"></i> Back to Eligibility
         </a>
-        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
-            <i class="bi bi-check-circle-fill me-1"></i> Pre-Approved Limit: ৳@maxAmount.ToString("N2")
-        </span>
+        <div class="d-flex gap-2">
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
+                <i class="bi bi-check-circle-fill me-1"></i> Pre-Approved Limit: ৳@maxAmount.ToString("N2")
+            </span>
+            <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-3 py-1">
+                <i class="bi bi-percent me-1"></i> Indicative Rate: @indicativeRate.ToString("F2")%
+            </span>
+        </div>
     </div>
 
-    <!-- Application Form Card -->
-    <div class="sb-card p-4 p-md-5">
-        <div class="text-center mb-4 pb-2 border-bottom">
-            <div class="stat-icon-wrapper stat-icon-primary mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
-                <i class="bi bi-cash-coin"></i>
+    <div class="row g-4">
+        <!-- Main Form Column -->
+        <div class="col-lg-7">
+            <div class="sb-card p-4 p-md-5 h-100">
+                <div class="text-center mb-4 pb-2 border-bottom border-secondary border-opacity-25">
+                    <div class="stat-icon-wrapper stat-icon-primary mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        <i class="bi bi-cash-coin"></i>
+                    </div>
+                    <h3 class="fw-extrabold text-white mb-1">Smart Loan Application</h3>
+                    <p class="text-secondary small mb-0">
+                        Submit your loan request with customized tenure and monthly installment structure.
+                    </p>
+                </div>
+
+                <!-- Pre-Approved Summary Banner -->
+                <div class="p-3 rounded-3 mb-4 d-flex justify-content-between align-items-center" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25);">
+                    <div>
+                        <div class="text-muted small fw-semibold">DISBURSEMENT ACCOUNT</div>
+                        <div class="fw-bold text-white fs-6">
+                            @(user?.FullName) • <code class="text-info">@(account?.AccountNumber)</code>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-muted small fw-semibold">MAX CREDIT LIMIT</div>
+                        <div class="fw-bold text-success fs-5">৳@maxAmount.ToString("N2")</div>
+                    </div>
+                </div>
+
+                <form asp-controller="Loan" asp-action="Apply" method="post" id="loanApplyForm">
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger shadow-sm small mb-4" role="alert"></div>
+
+                    <!-- Loan Type Selection -->
+                    <div class="mb-4">
+                        <label asp-for="LoanType" class="form-label fw-bold text-white small">LOAN CATEGORY <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-tag-fill"></i></span>
+                            <select asp-for="LoanType" id="loanTypeSelect" class="form-select form-select-lg bg-dark text-white border-secondary">
+                                <option value="Personal" data-min="6" data-max="24">Personal Loan (6 – 24 months)</option>
+                                <option value="Emergency" data-min="3" data-max="12">Emergency Liquidity (3 – 12 months)</option>
+                                <option value="Education" data-min="12" data-max="36">Higher Education (12 – 36 months)</option>
+                                <option value="Business" data-min="6" data-max="36">Small Business Loan (6 – 36 months)</option>
+                                <option value="Home" data-min="24" data-max="60">Home Renovation Loan (24 – 60 months)</option>
+                            </select>
+                        </div>
+                        <span asp-validation-for="LoanType" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Requested Loan Amount -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label asp-for="RequestedAmount" class="form-label fw-bold text-white small mb-0">REQUESTED LOAN AMOUNT (৳) <span class="text-danger">*</span></label>
+                            <span class="text-info small">Max: ৳@maxAmount.ToString("N2")</span>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">৳</span>
+                            <input asp-for="RequestedAmount" id="inputLoanAmount" type="number" step="1000" min="1000" max="@maxAmount" class="form-control form-control-lg bg-dark text-white border-secondary fs-4 fw-bold" placeholder="0.00" required />
+                        </div>
+                        
+                        <!-- Fast Selection Amount Chips -->
+                        <div class="d-flex flex-wrap gap-2 mt-2" id="loanChipsContainer">
+                            @if (maxAmount >= 25000)
+                            {
+                                <button type="button" class="preset-chip" data-value="25000">৳25,000</button>
+                            }
+                            @if (maxAmount >= 50000)
+                            {
+                                <button type="button" class="preset-chip" data-value="50000">৳50,000</button>
+                            }
+                            @if (maxAmount >= 100000)
+                            {
+                                <button type="button" class="preset-chip" data-value="100000">৳100,000</button>
+                            }
+                            @if (maxAmount >= 200000)
+                            {
+                                <button type="button" class="preset-chip" data-value="200000">৳200,000</button>
+                            }
+                            <button type="button" class="preset-chip active" data-value="@maxAmount">Max (৳@maxAmount.ToString("N0"))</button>
+                        </div>
+                        <span asp-validation-for="RequestedAmount" class="text-danger small" id="errLoanAmount"></span>
+                    </div>
+
+                    <!-- Repayment Tenure Months Slider & Input -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label asp-for="RequestedTenureMonths" class="form-label fw-bold text-white small mb-0">REPAYMENT TENURE (MONTHS) <span class="text-danger">*</span></label>
+                            <span class="text-primary fw-bold fs-6" id="tenureBadge">12 Months</span>
+                        </div>
+                        <input type="range" class="form-range" id="tenureRange" min="6" max="24" step="1" value="12" />
+                        <input type="hidden" asp-for="RequestedTenureMonths" id="inputTenure" value="12" />
+                        <div class="d-flex justify-content-between text-secondary small" id="tenureLimitsText">
+                            <span>Min: 6 mo</span>
+                            <span>Max: 24 mo</span>
+                        </div>
+                        <span asp-validation-for="RequestedTenureMonths" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Monthly Income (Income Verification) -->
+                    <div class="mb-4">
+                        <label asp-for="MonthlyIncome" class="form-label fw-bold text-white small">DECLARED MONTHLY INCOME (৳) <span class="text-muted fw-normal">(Optional)</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">৳</span>
+                            <input asp-for="MonthlyIncome" id="inputIncome" type="number" step="500" min="0" max="10000000" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="e.g. 75,000" />
+                        </div>
+                        <div class="form-text text-secondary" style="font-size: 0.78rem;">Used to verify Debt-to-Income (DTI) ratio during loan underwriting.</div>
+                        <span asp-validation-for="MonthlyIncome" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Loan Purpose -->
+                    <div class="mb-4">
+                        <label asp-for="Purpose" class="form-label fw-bold text-white small">LOAN PURPOSE & STATEMENT <span class="text-danger">*</span></label>
+                        <textarea asp-for="Purpose" rows="3" class="form-control bg-dark text-white border-secondary" placeholder="Please describe how this loan will be utilized (e.g., Medical treatment, inventory purchase, tuition fees)..." required></textarea>
+                        <div class="form-text text-secondary" style="font-size: 0.78rem;">Minimum 5 characters. Clear statements assist faster underwriting.</div>
+                        <span asp-validation-for="Purpose" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Simulation Scope & Terms Disclaimer -->
+                    <div class="p-3 rounded-3 mb-4 bg-light bg-opacity-10 border border-secondary border-opacity-25">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termsCheck" required checked>
+                            <label class="form-check-label text-secondary small" for="termsCheck">
+                                I certify that the information provided is accurate. I understand that the final loan interest rate, approved amount, and EMI schedule are subject to official underwriter review.
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn-cta-primary py-3 fs-6" id="btnSubmitLoan">
+                            <i class="bi bi-send-check-fill me-2"></i> Submit Loan Application
+                        </button>
+                        <a asp-controller="Loan" asp-action="Eligibility" class="btn btn-outline-secondary rounded-pill py-2">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
             </div>
-            <h3 class="fw-extrabold text-white mb-1">Smart Loan Application</h3>
-            <p class="text-secondary small mb-0">
-                Submit your loan request. Applications are processed seamlessly by our credit review team.
-            </p>
         </div>
 
-        <!-- Pre-Approved Summary Banner -->
-        <div class="p-3 rounded-3 mb-4 d-flex justify-content-between align-items-center" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25);">
-            <div>
-                <div class="text-muted small fw-semibold">BENEFICIARY ACCOUNT</div>
-                <div class="fw-bold text-white fs-6">
-                    @(user?.FullName) • <code class="text-info">@(account?.AccountNumber)</code>
+        <!-- Live EMI Preview / Calculator Column -->
+        <div class="col-lg-5">
+            <div class="sb-card p-4 sticky-top" style="top: 20px;">
+                <h5 class="fw-bold text-white mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-calculator text-primary"></i> Live EMI &amp; Repayment Estimator
+                </h5>
+                <p class="text-secondary small mb-4">
+                    Based on your indicative interest rate of <strong class="text-info">@indicativeRate.ToString("F2")% p.a.</strong> (Reducing Balance Formula).
+                </p>
+
+                <div class="p-3 rounded-4 mb-3 text-center" style="background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3);">
+                    <div class="text-uppercase small fw-bold text-info tracking-wider">Estimated Monthly EMI</div>
+                    <div class="display-5 fw-extrabold text-white mt-1" id="liveEmiDisplay">৳0.00</div>
+                    <div class="small text-secondary mt-1" id="liveTenureSubtext">for 12 months</div>
                 </div>
-            </div>
-            <div class="text-end">
-                <div class="text-muted small fw-semibold">MAXIMUM ELIGIBLE SUM</div>
-                <div class="fw-bold text-success fs-5">৳@maxAmount.ToString("N2")</div>
+
+                <div class="d-flex flex-column gap-2 p-3 rounded-3 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-secondary">Principal Amount:</span>
+                        <span class="text-white fw-bold" id="livePrincipalDisplay">৳0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-secondary">Total Interest Payable:</span>
+                        <span class="text-warning fw-bold" id="liveInterestDisplay">৳0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between small border-top border-secondary border-opacity-25 pt-2">
+                        <span class="text-secondary fw-bold">Total Repayable:</span>
+                        <span class="text-success fw-bold fs-6" id="liveTotalDisplay">৳0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between small" id="dtiRow" style="display: none !important;">
+                        <span class="text-secondary">Est. Debt-to-Income (DTI):</span>
+                        <span class="fw-bold" id="liveDtiDisplay">0%</span>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);">
+                    <div class="d-flex align-items-center gap-2 text-warning small fw-bold mb-1">
+                        <i class="bi bi-shield-check"></i> Standard Underwriting Note
+                    </div>
+                    <p class="text-light mb-0" style="font-size: 0.78rem; line-height: 1.4; opacity: 0.85;">
+                        Installments will be generated upon formal approval. First installment is due exactly 30 days after loan disbursement.
+                    </p>
+                </div>
             </div>
         </div>
-
-        <form asp-controller="Loan" asp-action="Apply" method="post" id="loanApplyForm">
-            @Html.AntiForgeryToken()
-
-            <div asp-validation-summary="ModelOnly" class="alert alert-danger shadow-sm small mb-4" role="alert"></div>
-
-            <!-- Loan Type Selection -->
-            <div class="mb-4">
-                <label asp-for="LoanType" class="form-label fw-bold text-white small">LOAN CATEGORY <span class="text-danger">*</span></label>
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-tag-fill"></i></span>
-                    <select asp-for="LoanType" class="form-select form-select-lg bg-dark text-white border-secondary">
-                        <option value="Personal">Personal Loan</option>
-                        <option value="Business">Small Business Loan</option>
-                        <option value="Education">Higher Education Financing</option>
-                        <option value="Emergency">Emergency Liquidity</option>
-                        <option value="Home">Home Renovation Loan</option>
-                    </select>
-                </div>
-                <span asp-validation-for="LoanType" class="text-danger small"></span>
-            </div>
-
-            <!-- Monthly Income (Income Verification) -->
-            <div class="mb-4">
-                <label asp-for="MonthlyIncome" class="form-label fw-bold text-white small">DECLARED MONTHLY INCOME (৳) <span class="text-muted fw-normal">(Optional)</span></label>
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-secondary">৳</span>
-                    <input asp-for="MonthlyIncome" type="number" step="500" min="0" max="10000000" class="form-control form-control-lg bg-dark text-white border-secondary" placeholder="e.g. 75,000" />
-                </div>
-                <div class="form-text text-secondary" style="font-size: 0.78rem;">Your primary monthly salary or business turnover.</div>
-                <span asp-validation-for="MonthlyIncome" class="text-danger small"></span>
-            </div>
-
-            <!-- Requested Loan Amount -->
-            <div class="mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <label asp-for="RequestedAmount" class="form-label fw-bold text-white small mb-0">REQUESTED LOAN AMOUNT (৳) <span class="text-danger">*</span></label>
-                    <span class="text-info small">Max: ৳@maxAmount.ToString("N2")</span>
-                </div>
-                <div class="input-group">
-                    <span class="input-group-text bg-dark border-secondary text-secondary">৳</span>
-                    <input asp-for="RequestedAmount" id="inputLoanAmount" type="number" step="1000" min="1000" max="@maxAmount" class="form-control form-control-lg bg-dark text-white border-secondary fs-4 fw-bold" placeholder="0.00" required />
-                </div>
-                
-                <!-- Fast Selection Amount Chips -->
-                <div class="d-flex flex-wrap gap-2 mt-2" id="loanChipsContainer">
-                    @if (maxAmount >= 25000)
-                    {
-                        <button type="button" class="preset-chip" data-value="25000">৳25,000</button>
-                    }
-                    @if (maxAmount >= 50000)
-                    {
-                        <button type="button" class="preset-chip" data-value="50000">৳50,000</button>
-                    }
-                    @if (maxAmount >= 100000)
-                    {
-                        <button type="button" class="preset-chip" data-value="100000">৳100,000</button>
-                    }
-                    @if (maxAmount >= 200000)
-                    {
-                        <button type="button" class="preset-chip" data-value="200000">৳200,000</button>
-                    }
-                    <button type="button" class="preset-chip active" data-value="@maxAmount">Max (৳@maxAmount.ToString("N0"))</button>
-                </div>
-                <span asp-validation-for="RequestedAmount" class="text-danger small" id="errLoanAmount"></span>
-            </div>
-
-            <!-- Loan Purpose -->
-            <div class="mb-4">
-                <label asp-for="Purpose" class="form-label fw-bold text-white small">LOAN PURPOSE & STATEMENT <span class="text-danger">*</span></label>
-                <textarea asp-for="Purpose" rows="3" class="form-control bg-dark text-white border-secondary" placeholder="Please describe how this loan will be utilized (e.g., Medical treatment, inventory purchase, tuition fees)..." required></textarea>
-                <div class="form-text text-secondary" style="font-size: 0.78rem;">Minimum 5 characters. Must be clear for administrative review.</div>
-                <span asp-validation-for="Purpose" class="text-danger small"></span>
-            </div>
-
-            <!-- Simulation Scope & Terms Disclaimer -->
-            <div class="p-3 rounded-3 mb-4 bg-light border border-white-10">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="termsCheck" required checked>
-                    <label class="form-check-label text-secondary small" for="termsCheck">
-                        I certify that the information provided is true and accurate. I understand that loan approval is subject to automated rule validation and administrator approval.
-                    </label>
-                </div>
-            </div>
-
-            <div class="d-grid gap-2">
-                <button type="submit" class="btn-cta-primary py-3 fs-6" id="btnSubmitLoan">
-                    <i class="bi bi-send-check-fill me-2"></i> Submit Loan Application
-                </button>
-                <a asp-controller="Loan" asp-action="Eligibility" class="btn btn-outline-secondary rounded-pill py-2">
-                    Cancel
-                </a>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -147,6 +218,86 @@
             const amountInput = document.getElementById('inputLoanAmount');
             const chips = document.querySelectorAll('#loanChipsContainer .preset-chip');
             const maxVal = @maxAmount;
+            const indicativeRate = @indicativeRate;
+
+            const loanTypeSelect = document.getElementById('loanTypeSelect');
+            const tenureRange = document.getElementById('tenureRange');
+            const inputTenure = document.getElementById('inputTenure');
+            const tenureBadge = document.getElementById('tenureBadge');
+            const tenureLimitsText = document.getElementById('tenureLimitsText');
+            const inputIncome = document.getElementById('inputIncome');
+
+            const liveEmiDisplay = document.getElementById('liveEmiDisplay');
+            const liveTenureSubtext = document.getElementById('liveTenureSubtext');
+            const livePrincipalDisplay = document.getElementById('livePrincipalDisplay');
+            const liveInterestDisplay = document.getElementById('liveInterestDisplay');
+            const liveTotalDisplay = document.getElementById('liveTotalDisplay');
+            const dtiRow = document.getElementById('dtiRow');
+            const liveDtiDisplay = document.getElementById('liveDtiDisplay');
+
+            function updateTenureLimits() {
+                const opt = loanTypeSelect.options[loanTypeSelect.selectedIndex];
+                const min = parseInt(opt.getAttribute('data-min')) || 6;
+                const max = parseInt(opt.getAttribute('data-max')) || 24;
+
+                tenureRange.min = min;
+                tenureRange.max = max;
+
+                let curVal = parseInt(tenureRange.value);
+                if (curVal < min) curVal = min;
+                if (curVal > max) curVal = max;
+
+                tenureRange.value = curVal;
+                inputTenure.value = curVal;
+                tenureBadge.innerText = `${curVal} Months`;
+                tenureLimitsText.innerHTML = `<span>Min: ${min} mo</span><span>Max: ${max} mo</span>`;
+
+                calculateLiveEmi();
+            }
+
+            function calculateLiveEmi() {
+                const p = parseFloat(amountInput.value) || 0;
+                const n = parseInt(tenureRange.value) || 12;
+                const rAnnual = indicativeRate;
+
+                livePrincipalDisplay.innerText = `৳${p.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                liveTenureSubtext.innerText = `for ${n} months`;
+
+                if (p <= 0 || n <= 0) {
+                    liveEmiDisplay.innerText = "৳0.00";
+                    liveInterestDisplay.innerText = "৳0.00";
+                    liveTotalDisplay.innerText = "৳0.00";
+                    return;
+                }
+
+                // Reducing balance formula
+                const r = (rAnnual / 12) / 100;
+                let emi = 0;
+                if (r > 0) {
+                    const pow = Math.pow(1 + r, n);
+                    emi = p * (r * pow) / (pow - 1);
+                } else {
+                    emi = p / n;
+                }
+
+                const totalRepayable = emi * n;
+                const totalInterest = Math.max(0, totalRepayable - p);
+
+                liveEmiDisplay.innerText = `৳${emi.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                liveInterestDisplay.innerText = `৳${totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                liveTotalDisplay.innerText = `৳${totalRepayable.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+                // Calculate DTI if income entered
+                const income = parseFloat(inputIncome.value) || 0;
+                if (income > 0) {
+                    const dti = (emi / income) * 100;
+                    dtiRow.style.setProperty('display', 'flex', 'important');
+                    liveDtiDisplay.innerText = `${dti.toFixed(1)}%`;
+                    liveDtiDisplay.className = dti > 50 ? 'fw-bold text-danger' : 'fw-bold text-success';
+                } else {
+                    dtiRow.style.setProperty('display', 'none', 'important');
+                }
+            }
 
             chips.forEach(chip => {
                 chip.addEventListener('click', (e) => {
@@ -155,6 +306,7 @@
                     amountInput.value = val;
                     chips.forEach(c => c.classList.remove('active'));
                     chip.classList.add('active');
+                    calculateLiveEmi();
                 });
             });
 
@@ -168,7 +320,23 @@
                 } else {
                     errSpan.innerText = "";
                 }
+                calculateLiveEmi();
             });
+
+            loanTypeSelect.addEventListener('change', updateTenureLimits);
+
+            tenureRange.addEventListener('input', () => {
+                const val = tenureRange.value;
+                inputTenure.value = val;
+                tenureBadge.innerText = `${val} Months`;
+                calculateLiveEmi();
+            });
+
+            inputIncome.addEventListener('input', calculateLiveEmi);
+
+            // Initial setup
+            updateTenureLimits();
+            calculateLiveEmi();
         });
     </script>
 }

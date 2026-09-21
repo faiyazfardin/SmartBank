@@ -33,8 +33,4 @@
     </PackageReference>
   </ItemGroup>
 
-  <Target Name="KillRunningSmartBank" BeforeTargets="BeforeBuild" Condition="'$(OS)' == 'Windows_NT'">
-    <Exec Command="%SystemRoot%\System32\taskkill.exe /F /IM SmartBank.exe 2&gt;nul || exit 0" IgnoreExitCode="true" ContinueOnError="true" />
-  </Target>
-
 </Project>

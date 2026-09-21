@@ -57,37 +57,9 @@ namespace SmartBank.Controllers
             }
 
             var account = user.Accounts.FirstOrDefault();
-            var transactions = account != null
-                ? await _context.Transactions
-                    .Where(t => t.AccountId == account.Id)
-                    .OrderByDescending(t => t.Timestamp)
-                    .Take(15)
-                    .ToListAsync()
-                : new System.Collections.Generic.List<Transaction>();
-
-            decimal totalInflow = 0;
-            decimal totalOutflow = 0;
-
-            if (account != null)
-            {
-                var allTx = await _context.Transactions
-                    .Where(t => t.AccountId == account.Id)
-                    .ToListAsync();
-
-                totalInflow = allTx
-                    .Where(t => t.Type == TransactionType.Deposit || t.Type == TransactionType.TransferIn)
-                    .Sum(t => t.Amount);
-
-                totalOutflow = allTx
-                    .Where(t => t.Type == TransactionType.Withdraw || t.Type == TransactionType.TransferOut)
-                    .Sum(t => t.Amount);
-            }
 
             ViewBag.User = user;
             ViewBag.Account = account;
-            ViewBag.RecentTransactions = transactions;
-            ViewBag.TotalInflow = totalInflow;
-            ViewBag.TotalOutflow = totalOutflow;
             ViewBag.IsSuspended = user.Status?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true;
             ViewBag.LockedUntil = user.LockedUntil;
 

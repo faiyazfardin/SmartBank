@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartBank.Data;
 using SmartBank.DTOs.Loans;
+using SmartBank.Entities;
 using SmartBank.Services.Interfaces;
 
 namespace SmartBank.Controllers
@@ -16,15 +17,18 @@ namespace SmartBank.Controllers
         private readonly SmartBankDbContext _context;
         private readonly ILoanEligibilityService _eligibilityService;
         private readonly ILoanService _loanService;
+        private readonly ILoanCalculatorService _calculatorService;
 
         public LoanController(
             SmartBankDbContext context,
             ILoanEligibilityService eligibilityService,
-            ILoanService loanService)
+            ILoanService loanService,
+            ILoanCalculatorService calculatorService)
         {
             _context = context;
             _eligibilityService = eligibilityService;
             _loanService = loanService;
+            _calculatorService = calculatorService;
         }
 
         private int GetCurrentUserId()
@@ -83,7 +87,8 @@ namespace SmartBank.Controllers
             var model = new ApplyLoanRequest
             {
                 LoanType = "Personal",
-                RequestedAmount = Math.Min(50000m, eligibility.MaximumAmount)
+                RequestedAmount = Math.Min(50000m, eligibility.MaximumAmount),
+                RequestedTenureMonths = 12
             };
 
             return View(model);
@@ -112,7 +117,7 @@ namespace SmartBank.Controllers
 
             if (status == 201 && response.Data != null)
             {
-                TempData["SuccessToast"] = $"Loan Application {response.Data.ApplicationNumber} submitted successfully! Our loan team is reviewing it.";
+                TempData["SuccessToast"] = $"Loan Application {response.Data.ApplicationNumber} submitted successfully! Our underwriting team will review it.";
                 return RedirectToAction("Details", new { applicationNumber = response.Data.ApplicationNumber });
             }
 
@@ -142,15 +147,62 @@ namespace SmartBank.Controllers
             if (userId == 0) return RedirectToAction("Login", "Account");
 
             var isAdmin = User.IsInRole("Admin");
-            var app = await _loanService.GetApplicationByNumberAsync(userId, applicationNumber, isAdmin);
+            var details = await _loanService.GetLoanDetailsAsync(applicationNumber, userId, isAdmin);
 
-            if (app == null)
+            if (details == null)
             {
                 TempData["ErrorToast"] = "Loan application not found.";
                 return RedirectToAction(isAdmin ? "Loans" : "MyApplications", isAdmin ? "Admin" : "Loan");
             }
 
-            return View(app);
+            return View(details);
+        }
+
+        // GET: /Loan/Payments
+        [HttpGet]
+        public async Task<IActionResult> Payments()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == 0) return RedirectToAction("Login", "Account");
+
+            var apps = await _loanService.GetCustomerApplicationsAsync(userId);
+            var activeLoans = apps.Where(a => a.Status == "Approved" || a.Status == "Disbursed").ToList();
+
+            var fullDetailsList = new List<LoanDetailsDto>();
+            foreach (var app in activeLoans)
+            {
+                var det = await _loanService.GetLoanDetailsAsync(app.ApplicationNumber, userId, false);
+                if (det != null) fullDetailsList.Add(det);
+            }
+
+            return View(fullDetailsList);
+        }
+
+        // POST: /Loan/PreviewEmi (AJAX)
+        [HttpPost]
+        public async Task<IActionResult> PreviewEmi([FromBody] EmiPreviewRequest request)
+        {
+            var userId = GetCurrentUserId();
+            var eligibility = await _eligibilityService.EvaluateEligibilityAsync(userId);
+
+            decimal rate = eligibility.IndicativeRate;
+            int tenure = request.TenureMonths > 0 ? request.TenureMonths : 12;
+            decimal principal = request.Amount > 0 ? request.Amount : 10000m;
+
+            var emi = _calculatorService.CalculateEmi(principal, rate, tenure);
+            var totalRepayable = _calculatorService.CalculateTotalRepayable(emi, tenure);
+            var schedule = _calculatorService.GenerateSchedule(principal, rate, tenure, DateTime.UtcNow.AddMonths(1));
+
+            var response = new EmiPreviewResponse
+            {
+                IndicativeRate = rate,
+                Emi = emi,
+                TotalRepayable = totalRepayable,
+                TotalInterest = Math.Max(0, totalRepayable - principal),
+                SchedulePreview = schedule
+            };
+
+            return Json(response);
         }
     }
 }

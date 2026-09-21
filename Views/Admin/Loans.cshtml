@@ -6,24 +6,30 @@
     var currentSearch = ViewBag.CurrentSearch as string ?? "";
 }
 
-<div class="container-fluid py-4 px-lg-4" style="max-width: 1400px;">
+<div class="container-fluid py-4 px-lg-4" style="max-width: 1440px;">
     <!-- Top Header -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-25">
         <div>
             <div class="d-flex align-items-center gap-2">
-                <h3 class="fw-extrabold text-white mb-0">Loan Applications Governance</h3>
-                <span class="badge bg-danger rounded-pill px-3 py-1 small fw-bold">Admin Command</span>
+                <h3 class="fw-extrabold text-white mb-0">Loan Governance &amp; Underwriting</h3>
+                <span class="badge bg-danger rounded-pill px-3 py-1 small fw-bold">Admin Hub</span>
             </div>
             <p class="text-secondary small mb-0 mt-1">
-                Evaluate customer loan submissions, inspect automated rule scores, and execute underwriting approvals or rejections.
+                Underwrite loan applications, customize binding interest rates and tenures, track repayment schedules, and monitor debt recovery.
             </p>
         </div>
-        <div class="d-flex gap-2">
-            <a asp-controller="Admin" asp-action="Users" class="btn btn-outline-secondary rounded-pill px-3">
-                <i class="bi bi-people-fill me-1"></i> User Directory
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-controller="Admin" asp-action="LoanPayments" class="btn btn-outline-info rounded-pill px-3">
+                <i class="bi bi-receipt me-1"></i> Payment Ledger
             </a>
+            <form asp-controller="Admin" asp-action="MarkOverdue" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-warning rounded-pill px-3" title="Scan overdue installments & apply late fees">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Scan Overdue
+                </button>
+            </form>
             <a asp-controller="Admin" asp-action="Loans" class="btn btn-primary rounded-pill px-3">
-                <i class="bi bi-arrow-clockwise me-1"></i> Refresh List
+                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
             </a>
         </div>
     </div>
@@ -36,9 +42,9 @@
                     <i class="bi bi-folder2-open"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">TOTAL APPLICATIONS</div>
+                    <div class="text-muted small fw-semibold">TOTAL SUBMISSIONS</div>
                     <div class="fs-4 fw-bold text-white mt-1">@stats.TotalApplications</div>
-                    <div class="small text-muted">All-time submissions</div>
+                    <div class="small text-muted">Active: @stats.ActiveLoansCount</div>
                 </div>
             </div>
         </div>
@@ -51,7 +57,7 @@
                 <div>
                     <div class="text-muted small fw-semibold">PENDING REVIEW</div>
                     <div class="fs-4 fw-bold text-warning mt-1">@stats.PendingCount</div>
-                    <div class="small text-muted">Requires admin decision</div>
+                    <div class="small text-muted">Awaiting Underwriting</div>
                 </div>
             </div>
         </div>
@@ -59,12 +65,12 @@
         <div class="col-sm-6 col-xl-3">
             <div class="stat-widget h-100">
                 <div class="stat-icon-wrapper stat-icon-success">
-                    <i class="bi bi-patch-check-fill"></i>
+                    <i class="bi bi-cash-stack"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">APPROVED LOANS</div>
-                    <div class="fs-4 fw-bold text-success mt-1">@stats.ApprovedCount</div>
-                    <div class="small text-muted">Total: ৳@stats.TotalApprovedAmount.ToString("N2")</div>
+                    <div class="text-muted small fw-semibold">DISBURSED CAPITAL</div>
+                    <div class="fs-4 fw-bold text-success mt-1">৳@stats.TotalDisbursedAmount.ToString("N2")</div>
+                    <div class="small text-muted">Approved: @stats.ApprovedCount loans</div>
                 </div>
             </div>
         </div>
@@ -72,12 +78,12 @@
         <div class="col-sm-6 col-xl-3">
             <div class="stat-widget h-100">
                 <div class="stat-icon-wrapper stat-icon-danger">
-                    <i class="bi bi-x-circle-fill"></i>
+                    <i class="bi bi-exclamation-octagon-fill"></i>
                 </div>
                 <div>
-                    <div class="text-muted small fw-semibold">REJECTED APPLICATIONS</div>
-                    <div class="fs-4 fw-bold text-danger mt-1">@stats.RejectedCount</div>
-                    <div class="small text-muted">Denied under risk policy</div>
+                    <div class="text-muted small fw-semibold">OVERDUE INSTALLMENTS</div>
+                    <div class="fs-4 fw-bold text-danger mt-1">@stats.OverdueInstallmentsCount</div>
+                    <div class="small text-muted">Outstanding: ৳@stats.TotalOutstandingAmount.ToString("N2")</div>
                 </div>
             </div>
         </div>
@@ -96,9 +102,9 @@
             <div class="col-md-4">
                 <select name="statusFilter" class="form-select bg-dark text-white border-secondary" onchange="this.form.submit()">
                     <option value="" selected="@(string.IsNullOrEmpty(currentStatus))">All Statuses (@stats.TotalApplications)</option>
-                    <option value="Pending" selected="@(currentStatus == "Pending")">Pending Review Only (@stats.PendingCount)</option>
-                    <option value="Approved" selected="@(currentStatus == "Approved")">Approved Loans Only (@stats.ApprovedCount)</option>
-                    <option value="Rejected" selected="@(currentStatus == "Rejected")">Rejected Only (@stats.RejectedCount)</option>
+                    <option value="Pending" selected="@(currentStatus == "Pending")">Pending Underwriting Only (@stats.PendingCount)</option>
+                    <option value="Approved" selected="@(currentStatus == "Approved")">Approved / Active Loans (@stats.ApprovedCount)</option>
+                    <option value="Rejected" selected="@(currentStatus == "Rejected")">Rejected Applications (@stats.RejectedCount)</option>
                 </select>
             </div>
 
@@ -111,9 +117,9 @@
 
     <!-- Loan Applications Table Card -->
     <div class="sb-card p-0 overflow-hidden">
-        <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center">
+        <div class="p-3 bg-dark border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
             <h6 class="fw-bold text-white mb-0">
-                <i class="bi bi-table text-primary me-2"></i> Application Records (@(Model?.Count ?? 0))
+                <i class="bi bi-table text-primary me-2"></i> Underwriting Registry (@(Model?.Count ?? 0) Applications)
             </h6>
         </div>
 
@@ -128,8 +134,8 @@
                         <th>Requested</th>
                         <th>Score / Cap</th>
                         <th>Status</th>
-                        <th>Submitted Date</th>
-                        <th class="text-end">Underwriting Action</th>
+                        <th>Submitted</th>
+                        <th class="text-end">Underwriting Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -143,7 +149,7 @@
                                 </td>
                                 <td>
                                     <div class="fw-bold text-white">@app.CustomerName</div>
-                                    <div class="text-muted small" style="font-size: 0.75rem;">@app.CustomerEmail</div>
+                                    <div class="text-secondary small" style="font-size: 0.75rem;">@app.CustomerEmail</div>
                                 </td>
                                 <td>
                                     <code class="text-info">@app.AccountNumber</code>
@@ -155,20 +161,27 @@
                                 </td>
                                 <td>
                                     <div class="fw-bold text-success fs-6">৳@app.RequestedAmount.ToString("N2")</div>
+                                    <div class="text-secondary small" style="font-size: 0.72rem;">Tenure: @(app.RequestedTenureMonths ?? 12) mo</div>
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center gap-1">
                                         <span class="badge @(app.EligibilityScore >= 80 ? "bg-success-subtle text-success" : app.EligibilityScore >= 65 ? "bg-info-subtle text-info" : "bg-warning-subtle text-warning") rounded-pill">
                                             @app.EligibilityScore pts
                                         </span>
-                                        <span class="text-muted small" style="font-size: 0.72rem;">(Cap: ৳@app.EligibleAmount.ToString("N0"))</span>
+                                        <span class="text-secondary small" style="font-size: 0.72rem;">(Cap: ৳@app.EligibleAmount.ToString("N0"))</span>
                                     </div>
                                 </td>
                                 <td>
-                                    @if (app.Status == "Approved")
+                                    @if (app.Status == "Approved" || app.Status == "Disbursed")
                                     {
                                         <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">
                                             <i class="bi bi-check-circle-fill me-1"></i> Approved
+                                        </span>
+                                    }
+                                    else if (app.Status == "Closed")
+                                    {
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-3 py-1">
+                                            <i class="bi bi-patch-check-fill me-1"></i> Closed
                                         </span>
                                     }
                                     else if (app.Status == "Rejected")
@@ -184,95 +197,30 @@
                                         </span>
                                     }
                                 </td>
-                                <td class="text-muted small">
-                                    @app.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                <td class="text-secondary small">
+                                    @app.CreatedAt.ToString("MMM dd, yyyy")
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <a asp-controller="Loan" asp-action="Details" asp-route-applicationNumber="@app.ApplicationNumber" class="btn btn-sm btn-outline-info rounded-pill px-2 me-1" title="View Details">
-                                            <i class="bi bi-eye"></i> View
+                                        <a asp-controller="Loan" asp-action="Details" asp-route-applicationNumber="@app.ApplicationNumber" class="btn btn-sm btn-outline-info rounded-pill px-2 me-1" title="View Full Details">
+                                            <i class="bi bi-eye"></i> Details
                                         </a>
+                                        @if (app.Status == "Approved" || app.Status == "Disbursed" || app.Status == "Closed")
+                                        {
+                                            <a asp-controller="Admin" asp-action="LoanSchedule" asp-route-id="@app.Id" class="btn btn-sm btn-outline-light rounded-pill px-2 me-1" title="View Schedule">
+                                                <i class="bi bi-calendar3"></i> Schedule
+                                            </a>
+                                        }
                                         @if (app.Status == "Pending")
                                         {
-                                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2 me-1" data-bs-toggle="modal" data-bs-target="#approveModal-@app.Id">
-                                                <i class="bi bi-check-lg"></i> Approve
+                                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2 me-1" data-bs-toggle="modal" data-bs-target="#underwriteModal-@app.Id">
+                                                <i class="bi bi-pencil-square"></i> Underwrite
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2" data-bs-toggle="modal" data-bs-target="#rejectModal-@app.Id">
                                                 <i class="bi bi-x-lg"></i> Reject
                                             </button>
                                         }
                                     </div>
-
-                                    <!-- Approve Modal -->
-                                    @if (app.Status == "Pending")
-                                    {
-                                        <div class="modal fade" id="approveModal-@app.Id" tabindex="-1" aria-labelledby="approveModalLabel-@app.Id" aria-hidden="true">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content bg-dark border-secondary text-start">
-                                                    <div class="modal-header border-secondary">
-                                                        <h5 class="modal-title text-white" id="approveModalLabel-@app.Id">
-                                                            <i class="bi bi-check-circle text-success me-2"></i> Approve Loan @app.ApplicationNumber
-                                                        </h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <form asp-controller="Admin" asp-action="ApproveLoan" method="post">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="applicationNumber" value="@app.ApplicationNumber" />
-                                                        <div class="modal-body">
-                                                            <div class="p-3 rounded-3 bg-dark border border-secondary mb-3">
-                                                                <div class="d-flex justify-content-between text-muted small">
-                                                                    <span>Applicant: <strong class="text-white">@app.CustomerName</strong></span>
-                                                                    <span>Amount: <strong class="text-success">৳@app.RequestedAmount.ToString("N2")</strong></span>
-                                                                </div>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label text-white small fw-bold">APPROVAL COMMENT / NOTE</label>
-                                                                <textarea name="comment" rows="3" class="form-control bg-dark text-white border-secondary" placeholder="Eligibility requirements satisfied. Approved for credit disbursement." required>Eligibility requirements satisfied.</textarea>
-                                                            </div>
-                                                        </div>
-                                                        <div class="modal-footer border-secondary">
-                                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-success rounded-pill px-4">Confirm Approval</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Reject Modal -->
-                                        <div class="modal fade" id="rejectModal-@app.Id" tabindex="-1" aria-labelledby="rejectModalLabel-@app.Id" aria-hidden="true">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content bg-dark border-secondary text-start">
-                                                    <div class="modal-header border-secondary">
-                                                        <h5 class="modal-title text-white" id="rejectModalLabel-@app.Id">
-                                                            <i class="bi bi-x-circle text-danger me-2"></i> Reject Loan @app.ApplicationNumber
-                                                        </h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <form asp-controller="Admin" asp-action="RejectLoan" method="post">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="applicationNumber" value="@app.ApplicationNumber" />
-                                                        <div class="modal-body">
-                                                            <div class="p-3 rounded-3 bg-dark border border-secondary mb-3">
-                                                                <div class="d-flex justify-content-between text-muted small">
-                                                                    <span>Applicant: <strong class="text-white">@app.CustomerName</strong></span>
-                                                                    <span>Amount: <strong class="text-danger">৳@app.RequestedAmount.ToString("N2")</strong></span>
-                                                                </div>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label class="form-label text-white small fw-bold">REJECTION REASON</label>
-                                                                <textarea name="comment" rows="3" class="form-control bg-dark text-white border-secondary" placeholder="Eligibility requirements not satisfied." required>Eligibility requirements not satisfied.</textarea>
-                                                            </div>
-                                                        </div>
-                                                        <div class="modal-footer border-secondary">
-                                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-danger rounded-pill px-4">Confirm Rejection</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    }
                                 </td>
                             </tr>
                         }
@@ -282,7 +230,7 @@
                         <tr>
                             <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
-                                No loan applications found matching the selected filter.
+                                No loan applications found matching the selected criteria.
                             </td>
                         </tr>
                     }
@@ -291,3 +239,196 @@
         </div>
     </div>
 </div>
+
+<!-- All Modals Rendered Outside Table Container to prevent z-index/overflow clipping -->
+@if (Model != null)
+{
+    @foreach (var app in Model.Where(a => a.Status == "Pending"))
+    {
+        var defaultRate = app.IndicativeRate ?? 10.50m;
+        var defaultTenure = app.RequestedTenureMonths ?? 12;
+
+        <!-- Underwriting & Approval Modal -->
+        <div class="modal fade" id="underwriteModal-@app.Id" tabindex="-1" aria-labelledby="underwriteModalLabel-@app.Id" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content bg-dark border-secondary text-start shadow-lg">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-white" id="underwriteModalLabel-@app.Id">
+                            <i class="bi bi-shield-check text-success me-2"></i> Underwrite &amp; Approve Loan: @app.ApplicationNumber
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form asp-controller="Admin" asp-action="ApproveLoan" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="applicationNumber" value="@app.ApplicationNumber" />
+                        
+                        <div class="modal-body">
+                            <!-- Applicant Summary Header -->
+                            <div class="p-3 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-50 mb-4">
+                                <div class="row g-2">
+                                    <div class="col-sm-4">
+                                        <span class="text-secondary small">Applicant:</span>
+                                        <div class="fw-bold text-white">@app.CustomerName</div>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <span class="text-secondary small">Account Number:</span>
+                                        <div class="font-monospace text-info fw-bold">@app.AccountNumber</div>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <span class="text-secondary small">Eligibility Tier:</span>
+                                        <div class="text-warning fw-bold">@app.EligibilityScore pts (@app.EligibilityCategory)</div>
+                                    </div>
+                                    <div class="col-12 mt-2 pt-2 border-top border-secondary border-opacity-25 small">
+                                        <span class="text-secondary">Declared Purpose:</span> <span class="text-light">@app.Purpose</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Editable Underwriting Parameters -->
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label text-white small fw-bold">APPROVED AMOUNT (৳) <span class="text-danger">*</span></label>
+                                    <input type="number" name="approvedAmount" step="1000" min="1000" max="@app.EligibleAmount" value="@app.RequestedAmount" class="form-control bg-dark text-white border-secondary modal-amount-input" data-app-id="@app.Id" required />
+                                    <div class="form-text text-secondary" style="font-size: 0.72rem;">Eligible Cap: ৳@app.EligibleAmount.ToString("N0")</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label text-white small fw-bold">INTEREST RATE (% p.a.) <span class="text-danger">*</span></label>
+                                    <input type="number" name="interestRate" step="0.05" min="1" max="40" value="@defaultRate" class="form-control bg-dark text-white border-secondary modal-rate-input" data-app-id="@app.Id" required />
+                                    <div class="form-text text-secondary" style="font-size: 0.72rem;">Indicative: @defaultRate.ToString("F2")%</div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label text-white small fw-bold">TENURE (MONTHS) <span class="text-danger">*</span></label>
+                                    <input type="number" name="tenureMonths" min="3" max="60" value="@defaultTenure" class="form-control bg-dark text-white border-secondary modal-tenure-input" data-app-id="@app.Id" required />
+                                    <div class="form-text text-secondary" style="font-size: 0.72rem;">Requested: @defaultTenure mo</div>
+                                </div>
+                            </div>
+
+                            <!-- Computed Terms Preview -->
+                            <div class="p-3 rounded-3 mb-3" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4);">
+                                <div class="row text-center g-2">
+                                    <div class="col-4">
+                                        <div class="text-secondary small">Calculated Monthly EMI</div>
+                                        <div class="fs-5 fw-bold text-success modal-emi-preview" id="modalEmi-@app.Id">৳0.00</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="text-secondary small">Total Repayable</div>
+                                        <div class="fs-5 fw-bold text-white modal-total-preview" id="modalTotal-@app.Id">৳0.00</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="text-secondary small">Total Interest</div>
+                                        <div class="fs-5 fw-bold text-warning modal-interest-preview" id="modalInterest-@app.Id">৳0.00</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-white small fw-bold">UNDERWRITER APPROVAL NOTES</label>
+                                <textarea name="comment" rows="2" class="form-control bg-dark text-white border-secondary" placeholder="Underwritten and approved per risk policy.">Approved after banking criteria review.</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                                <i class="bi bi-check2-circle me-1"></i> Approve &amp; Disburse Loan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reject Modal -->
+        <div class="modal fade" id="rejectModal-@app.Id" tabindex="-1" aria-labelledby="rejectModalLabel-@app.Id" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark border-secondary text-start shadow-lg">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-white" id="rejectModalLabel-@app.Id">
+                            <i class="bi bi-x-circle text-danger me-2"></i> Reject Loan @app.ApplicationNumber
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form asp-controller="Admin" asp-action="RejectLoan" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="applicationNumber" value="@app.ApplicationNumber" />
+                        <div class="modal-body">
+                            <div class="p-3 rounded-3 bg-black bg-opacity-50 border border-secondary mb-3">
+                                <div class="d-flex justify-content-between text-muted small">
+                                    <span>Applicant: <strong class="text-white">@app.CustomerName</strong></span>
+                                    <span>Amount: <strong class="text-danger">৳@app.RequestedAmount.ToString("N2")</strong></span>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-white small fw-bold">REJECTION REASON</label>
+                                <textarea name="comment" rows="3" class="form-control bg-dark text-white border-secondary" placeholder="Eligibility requirements not satisfied." required>Application does not meet current credit risk parameters.</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">Confirm Rejection</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            function updateModalCalculations(appId) {
+                const amountInput = document.querySelector(`.modal-amount-input[data-app-id="${appId}"]`);
+                const rateInput = document.querySelector(`.modal-rate-input[data-app-id="${appId}"]`);
+                const tenureInput = document.querySelector(`.modal-tenure-input[data-app-id="${appId}"]`);
+
+                if (!amountInput || !rateInput || !tenureInput) return;
+
+                const p = parseFloat(amountInput.value) || 0;
+                const rAnnual = parseFloat(rateInput.value) || 0;
+                const n = parseInt(tenureInput.value) || 12;
+
+                const emiEl = document.getElementById(`modalEmi-${appId}`);
+                const totalEl = document.getElementById(`modalTotal-${appId}`);
+                const interestEl = document.getElementById(`modalInterest-${appId}`);
+
+                if (p <= 0 || n <= 0) {
+                    if (emiEl) emiEl.innerText = "৳0.00";
+                    if (totalEl) totalEl.innerText = "৳0.00";
+                    if (interestEl) interestEl.innerText = "৳0.00";
+                    return;
+                }
+
+                const r = (rAnnual / 12) / 100;
+                let emi = 0;
+                if (r > 0) {
+                    const pow = Math.pow(1 + r, n);
+                    emi = p * (r * pow) / (pow - 1);
+                } else {
+                    emi = p / n;
+                }
+
+                const totalRepayable = emi * n;
+                const totalInterest = Math.max(0, totalRepayable - p);
+
+                if (emiEl) emiEl.innerText = `৳${emi.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (totalEl) totalEl.innerText = `৳${totalRepayable.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                if (interestEl) interestEl.innerText = `৳${totalInterest.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            }
+
+            document.querySelectorAll('.modal-amount-input, .modal-rate-input, .modal-tenure-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    const appId = input.getAttribute('data-app-id');
+                    updateModalCalculations(appId);
+                });
+            });
+
+            // Initial calculation for each modal
+            document.querySelectorAll('.modal-amount-input').forEach(input => {
+                const appId = input.getAttribute('data-app-id');
+                updateModalCalculations(appId);
+            });
+        });
+    </script>
+}

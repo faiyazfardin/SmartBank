@@ -54,6 +54,18 @@ namespace SmartBank.Entities
 
         public DateTime? TemporaryPasswordIssuedAtUtc { get; set; }
 
+        public string? VaultPasswordHash { get; set; }
+
+        public DateTime? VaultPasswordSetAt { get; set; }
+
+        public int FailedVaultAttempts { get; set; } = 0;
+
+        public DateTime? VaultLockedUntil { get; set; }
+
+        public bool IsFirstLogin { get; set; } = true;
+
+        public DateTime? LastVaultUnlockAt { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

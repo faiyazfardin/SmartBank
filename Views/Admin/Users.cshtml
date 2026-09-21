@@ -365,9 +365,15 @@
                                             </form>
                                         }
 
+                                        <!-- View Details, History & Add Money Button -->
+                                        <button type="button" class="btn btn-sm btn-outline-info rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="View Profile, Full Transaction History & Deposit Money" 
+                                                onclick="openUserDetailsModal(@u.Id)">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+
                                         <!-- Edit User Button -->
                                         <button type="button" class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Edit User" 
-                                                onclick="openEditUserModal(@u.Id, '@u.FullName', '@u.Username', '@u.Email', '@(u.PhoneNumber ?? "")', '@(u.NidNumber ?? "")', '@u.Role', '@u.Status', '@(acc?.AccountNumber ?? "")', @(acc?.Balance ?? 0), @(acc?.IsActive == true ? "true" : "false"))">
+                                                onclick="openEditUserModal(@u.Id, '@u.FullName', '@u.Username', '@u.Email', '@(u.PhoneNumber ?? "")', '@(u.NidNumber ?? "")', '@u.Role', '@u.Status', '@(acc?.AccountNumber ?? "")', @(acc?.IsActive == true ? "true" : "false"))">
                                             <i class="bi bi-pencil"></i>
                                         </button>
 
@@ -602,13 +608,10 @@
                     </div>
                     <hr />
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label class="form-label fw-semibold small text-secondary">Account Number</label>
                             <input type="text" id="editAccountNumber" name="accountNumber" class="form-control font-monospace" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold small text-secondary">Balance (৳)</label>
-                            <input type="number" id="editBalance" name="balance" class="form-control fw-bold text-success" step="0.01" />
+                            <div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>To adjust balance, use the <strong>View Profile &amp; Add Money</strong> button on the user row.</div>
                         </div>
                     </div>
                 </div>
@@ -757,10 +760,172 @@
     </div>
 </div>
 
+<!-- ========================================================================= -->
+<!-- MODAL: User Profile, Complete Transaction History & Instant Admin Deposit -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="userDetailsModal" tabindex="-1" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-2xl rounded-4 overflow-hidden" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.1) !important;">
+            <!-- Modal Header -->
+            <div class="modal-header bg-dark text-white border-secondary-subtle px-4 py-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold fs-5 shadow-sm" id="udModalAvatar" style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                        U
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="fw-bold mb-0 text-white" id="udModalFullName">Customer Profile</h5>
+                            <span class="badge rounded-pill px-2.5 py-1 text-white fw-bold small" id="udModalRoleBadge" style="background: #6366f1;">Customer</span>
+                            <span class="badge rounded-pill px-2.5 py-1 fw-bold small" id="udModalStatusBadge">Active</span>
+                        </div>
+                        <div class="text-secondary small mt-0.5">
+                            <span class="font-monospace text-info fw-semibold" id="udModalUsername">@@username</span> &bull; 
+                            Member Since: <span class="text-white fw-semibold" id="udModalCreatedAt">—</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4" style="background: #0f172a;">
+                <!-- Row 1: Profile & Account Overview Cards -->
+                <div class="row g-3 mb-4">
+                    <!-- Contact & KYC Info -->
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 h-100" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="fw-bold text-uppercase small text-primary mb-3">
+                                <i class="bi bi-person-badge me-1"></i> Contact &amp; KYC Identification
+                            </h6>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Email Address:</span>
+                                <strong class="text-white" id="udModalEmail">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Phone Number:</span>
+                                <strong class="text-white" id="udModalPhone">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>National ID (NID):</span>
+                                <strong class="text-warning font-monospace" id="udModalNid">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between pt-1 text-muted small">
+                                <span>User ID:</span>
+                                <strong class="text-secondary font-monospace" id="udModalUserId">#0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Banking Account & Balance Banner -->
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 h-100 position-relative overflow-hidden" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.35);">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-uppercase small fw-bold text-success" style="letter-spacing: 0.5px;">
+                                        <i class="bi bi-bank me-1"></i> Active Banking Account
+                                    </div>
+                                    <div class="font-monospace fw-bold text-white fs-6 mt-1" id="udModalAccNum">
+                                        100000000000
+                                    </div>
+                                </div>
+                                <span class="badge rounded-pill bg-success px-3 py-1 fw-bold small" id="udModalAccStatus">Active</span>
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="text-secondary small fw-semibold">CURRENT LIVE BALANCE</div>
+                                <div class="fs-2 fw-extrabold text-success mt-0.5" id="udModalBalance">
+                                    ৳0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Instant Admin Add Money / Deposit Panel -->
+                <div class="p-3 rounded-3 mb-4" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(99, 102, 241, 0.35);">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <h6 class="fw-bold text-white mb-0">
+                            <i class="bi bi-cash-stack text-info me-1"></i> Admin Instant Deposit (Add Funds)
+                        </h6>
+                        <span class="small text-muted">Direct ledger credit &bull; No customer password required</span>
+                    </div>
+
+                    <div id="udDepositAlert" class="alert d-none small py-2 px-3 mb-2"></div>
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Deposit Amount (৳) *</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-dark border-secondary text-success fw-bold">৳</span>
+                                <input type="number" id="udDepositAmount" class="form-control form-control-sm fw-bold text-success fs-6" placeholder="0.00" min="1" step="0.01" />
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Deposit Reference / Memo</label>
+                            <input type="text" id="udDepositRef" class="form-control form-control-sm" placeholder="e.g. Cash Deposit / Admin Adjustment" />
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" id="udBtnDeposit" class="btn btn-sm btn-success w-100 fw-bold rounded-pill shadow-sm" onclick="submitAdminDepositFromModal()">
+                                <i class="bi bi-plus-circle-fill me-1"></i> Add Funds Now
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Preset Amount Pills -->
+                    <div class="d-flex align-items-center gap-1.5 mt-2 flex-wrap">
+                        <span class="small text-muted me-1" style="font-size: 0.75rem;">Quick Presets:</span>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(1000)">+৳1,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(5000)">+৳5,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(10000)">+৳10,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(50000)">+৳50,000</button>
+                    </div>
+                </div>
+
+                <!-- Row 3: Complete Transaction History Table -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-white mb-0">
+                        <i class="bi bi-clock-history text-primary me-1"></i> Complete Itemized Transaction Ledger
+                    </h6>
+                    <div style="width: 250px;">
+                        <input type="text" id="udTxSearch" class="form-control form-control-sm" placeholder="Filter transactions..." onkeyup="filterUserTransactions(this.value)" />
+                    </div>
+                </div>
+
+                <div class="table-responsive rounded-3 border border-secondary-subtle" style="max-height: 340px; overflow-y: auto;">
+                    <table class="table sb-table align-middle small mb-0" id="udTxTable">
+                        <thead class="sticky-top bg-dark">
+                            <tr>
+                                <th>Ref / Tx ID</th>
+                                <th>Type &amp; Operation</th>
+                                <th>Amount (৳)</th>
+                                <th>Date &amp; Time</th>
+                                <th>Related Account</th>
+                            </tr>
+                        </thead>
+                        <tbody id="udTxTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading transaction history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-dark border-secondary-subtle px-4 py-3">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
     let editModalInstance = null;
     let deleteModalInstance = null;
+    let userDetailsModalInstance = null;
+    let currentViewingUserId = 0;
 
     document.addEventListener('DOMContentLoaded', () => {
         const editEl = document.getElementById('editUserModal');
@@ -768,9 +933,172 @@
 
         const delEl = document.getElementById('deleteUserModal');
         if (delEl) deleteModalInstance = new bootstrap.Modal(delEl);
+
+        const udEl = document.getElementById('userDetailsModal');
+        if (udEl) userDetailsModalInstance = new bootstrap.Modal(udEl);
     });
 
-    function openEditUserModal(id, fullName, username, email, phone, nid, role, status, accNumber, balance, isActive) {
+    function openUserDetailsModal(userId) {
+        currentViewingUserId = userId;
+        const tbody = document.getElementById('udTxTableBody');
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>Loading user information & ledger...</td></tr>`;
+
+        const alertDiv = document.getElementById('udDepositAlert');
+        if (alertDiv) alertDiv.className = 'alert d-none small py-2 px-3 mb-2';
+
+        document.getElementById('udDepositAmount').value = '';
+        document.getElementById('udDepositRef').value = '';
+
+        if (userDetailsModalInstance) userDetailsModalInstance.show();
+
+        fetch(`/Admin/GetUserDetails?userId=${userId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${data.message || 'Failed to load user profile'}</td></tr>`;
+                    return;
+                }
+
+                const u = data.user;
+                document.getElementById('udModalFullName').innerText = u.fullName;
+                document.getElementById('udModalUsername').innerText = '@@' + u.username;
+                document.getElementById('udModalEmail').innerText = u.email;
+                document.getElementById('udModalPhone').innerText = u.phoneNumber;
+                document.getElementById('udModalNid').innerText = u.nidNumber;
+                document.getElementById('udModalUserId').innerText = '#' + u.id;
+                document.getElementById('udModalCreatedAt').innerText = u.createdAt;
+                document.getElementById('udModalAccNum').innerText = u.accountNumber;
+                document.getElementById('udModalBalance').innerText = '৳' + Number(u.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('udModalAvatar').innerText = u.fullName.length > 0 ? u.fullName.substring(0, 1).toUpperCase() : 'U';
+
+                // Role & Status badges
+                const roleBadge = document.getElementById('udModalRoleBadge');
+                roleBadge.innerText = u.role;
+                roleBadge.style.background = u.role === 'Admin' ? '#ef4444' : '#6366f1';
+
+                const statusBadge = document.getElementById('udModalStatusBadge');
+                statusBadge.innerText = u.status;
+                if (u.status === 'Active') {
+                    statusBadge.className = 'badge rounded-pill bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fw-bold small';
+                } else if (u.status === 'Suspended') {
+                    statusBadge.className = 'badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1 fw-bold small';
+                } else {
+                    statusBadge.className = 'badge rounded-pill bg-danger-subtle text-danger border border-danger-subtle px-2.5 py-1 fw-bold small';
+                }
+
+                const accStatus = document.getElementById('udModalAccStatus');
+                accStatus.innerText = u.isActive ? 'Active' : 'Frozen';
+                accStatus.className = u.isActive ? 'badge rounded-pill bg-success px-3 py-1 fw-bold small' : 'badge rounded-pill bg-danger px-3 py-1 fw-bold small';
+
+                // Render Transactions
+                renderUserTransactions(data.transactions);
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error communicating with server.</td></tr>`;
+            });
+    }
+
+    function renderUserTransactions(transactions) {
+        const tbody = document.getElementById('udTxTableBody');
+        if (!transactions || transactions.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-inbox fs-4 d-block text-secondary mb-1"></i>No transaction records found for this account.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        transactions.forEach(t => {
+            const isCredit = t.isCredit;
+            let typeBadge = '';
+            if (t.type === 'Deposit') {
+                typeBadge = '<span class="badge bg-success-subtle text-success px-2 py-0.5 rounded-pill"><i class="bi bi-arrow-down-left"></i> Deposit</span>';
+            } else if (t.type === 'Withdraw') {
+                typeBadge = '<span class="badge bg-danger-subtle text-danger px-2 py-0.5 rounded-pill"><i class="bi bi-arrow-up-right"></i> Withdrawal</span>';
+            } else if (t.type === 'TransferIn') {
+                typeBadge = '<span class="badge bg-info-subtle text-info px-2 py-0.5 rounded-pill"><i class="bi bi-arrow-down-left"></i> Transfer In</span>';
+            } else {
+                typeBadge = '<span class="badge bg-warning-subtle text-warning px-2 py-0.5 rounded-pill"><i class="bi bi-arrow-up-right"></i> Transfer Out</span>';
+            }
+
+            html += `<tr>
+                <td class="font-monospace fw-bold text-info">#TX-${String(t.id).padStart(6, '0')}</td>
+                <td>${typeBadge}</td>
+                <td class="font-monospace fw-bold ${isCredit ? 'text-success' : 'text-danger'} fs-6">${isCredit ? '+' : '-'}৳${Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <td class="text-muted small">${t.timestamp}</td>
+                <td class="small text-secondary">${t.relatedAccountId ? 'Acc #' + t.relatedAccountId : 'Branch / Counter'}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function filterUserTransactions(query) {
+        const q = (query || '').toLowerCase().trim();
+        const rows = document.querySelectorAll('#udTxTableBody tr');
+        rows.forEach(r => {
+            const text = r.innerText.toLowerCase();
+            r.style.display = text.includes(q) ? '' : 'none';
+        });
+    }
+
+    function setDepositPreset(val) {
+        document.getElementById('udDepositAmount').value = Number(val).toFixed(2);
+    }
+
+    function submitAdminDepositFromModal() {
+        if (currentViewingUserId <= 0) return;
+        const amtInput = document.getElementById('udDepositAmount');
+        const refInput = document.getElementById('udDepositRef');
+        const btn = document.getElementById('udBtnDeposit');
+        const alertDiv = document.getElementById('udDepositAlert');
+
+        const amount = parseFloat(amtInput.value);
+        if (isNaN(amount) || amount <= 0) {
+            alertDiv.className = 'alert alert-danger small py-2 px-3 mb-2';
+            alertDiv.innerText = 'Please enter a valid deposit amount greater than zero.';
+            return;
+        }
+
+        const ref = refInput.value.trim();
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Processing...`;
+
+        fetch('/Admin/AdminDepositFunds', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentViewingUserId,
+                amount: amount,
+                reference: ref
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-plus-circle-fill me-1"></i> Add Funds Now`;
+
+            if (data.success) {
+                alertDiv.className = 'alert alert-success small py-2 px-3 mb-2';
+                alertDiv.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> ${data.message}`;
+                amtInput.value = '';
+                refInput.value = '';
+
+                // Immediately reload user details & ledger
+                openUserDetailsModal(currentViewingUserId);
+            } else {
+                alertDiv.className = 'alert alert-danger small py-2 px-3 mb-2';
+                alertDiv.innerText = data.message || 'Failed to deposit funds.';
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-plus-circle-fill me-1"></i> Add Funds Now`;
+            alertDiv.className = 'alert alert-danger small py-2 px-3 mb-2';
+            alertDiv.innerText = 'Network error during deposit.';
+        });
+    }
+
+    function openEditUserModal(id, fullName, username, email, phone, nid, role, status, accNumber, isActive) {
         document.getElementById('editUserId').value = id;
         document.getElementById('editFullName').value = fullName;
         document.getElementById('editUsername').value = username;
@@ -780,7 +1108,6 @@
         document.getElementById('editRole').value = role;
         document.getElementById('editStatus').value = status;
         document.getElementById('editAccountNumber').value = accNumber;
-        document.getElementById('editBalance').value = balance;
 
         if (editModalInstance) editModalInstance.show();
     }
@@ -805,8 +1132,8 @@
         const username = document.getElementById('editUsername').value;
         const role = document.getElementById('editRole').value;
         const nid = document.getElementById('editNidNumber').value;
-        const accNumber = document.getElementById('editAccountNumber').value;
-        const balance = document.getElementById('editBalance').value;
+        const accNumber = document.getElementById('editAccountNumber')?.value || '';
+        const balance = 0;
 
         if (editModalInstance) editModalInstance.hide();
         setTimeout(() => {

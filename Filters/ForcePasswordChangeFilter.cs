@@ -25,14 +25,24 @@ namespace SmartBank.Filters
 
             if (user.Identity != null && user.Identity.IsAuthenticated)
             {
+                // Admin accounts only require User ID and Password (bypass forced changes)
+                if (user.IsInRole("Admin"))
+                {
+                    await next();
+                    return;
+                }
+
                 var controllerName = context.RouteData.Values["controller"]?.ToString() ?? string.Empty;
                 var actionName = context.RouteData.Values["action"]?.ToString() ?? string.Empty;
 
-                // Exempt ChangePassword, Logout, and Account/Login GET
+                // Exempt FirstLoginPasswordChange, ChangePassword, Logout, and Account/Login
                 bool isExemptAction = string.Equals(controllerName, "Account", StringComparison.OrdinalIgnoreCase) &&
-                    (string.Equals(actionName, "ChangePassword", StringComparison.OrdinalIgnoreCase) ||
+                    (string.Equals(actionName, "FirstLoginPasswordChange", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(actionName, "ChangePassword", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(actionName, "Logout", StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(actionName, "LogoutGet", StringComparison.OrdinalIgnoreCase));
+                     string.Equals(actionName, "LogoutGet", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(actionName, "Login", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(actionName, "AccessDenied", StringComparison.OrdinalIgnoreCase));
 
                 if (!isExemptAction)
                 {
@@ -40,9 +50,9 @@ namespace SmartBank.Filters
                     if (int.TryParse(userIdClaim, out var userId) && userId > 0)
                     {
                         var dbUser = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-                        if (dbUser != null && dbUser.MustChangePasswordOnNextLogin)
+                        if (dbUser != null && !string.Equals(dbUser.Role, "Admin", StringComparison.OrdinalIgnoreCase) && (dbUser.IsFirstLogin || dbUser.MustChangePasswordOnNextLogin))
                         {
-                            context.Result = new RedirectToActionResult("ChangePassword", "Account", new { forced = "true" });
+                            context.Result = new RedirectToActionResult("FirstLoginPasswordChange", "Account", null);
                             return;
                         }
                     }
