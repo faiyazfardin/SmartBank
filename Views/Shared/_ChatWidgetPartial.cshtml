@@ -1,0 +1,444 @@
+@using System.Security.Claims
+
+@{
+    var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+    var isUserLoggedIn = User.Identity != null && User.Identity.IsAuthenticated && !User.IsInRole("Admin") && !string.IsNullOrEmpty(userIdClaim);
+}
+
+@if (isUserLoggedIn)
+{
+    <!-- Floating Chat Widget Button -->
+    <div id="smartbankChatBubbleContainer" class="position-fixed bottom-0 end-0 m-4 z-3 no-print">
+        <button type="button" id="smartbankChatBubble" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center position-relative transition-all" style="width: 58px; height: 58px; background: linear-gradient(135deg, #0d6efd 0%, #00d2ff 100%); border: 2px solid rgba(255,255,255,0.2);">
+            <i class="bi bi-chat-dots-fill fs-4 text-white" id="chatBubbleIcon"></i>
+            <span id="chatWidgetUnreadBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none" style="font-size: 0.75rem;">0</span>
+        </button>
+    </div>
+
+    <!-- Floating Chat Window Panel -->
+    <div id="smartbankChatPanel" class="position-fixed bottom-0 end-0 m-4 z-3 d-none flex-column glass-chat-panel shadow-lg overflow-hidden no-print" style="width: 370px; height: 530px; border-radius: 16px; margin-bottom: 80px !important;">
+        
+        <!-- Header -->
+        <div class="px-3 py-3 bg-dark bg-opacity-80 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <div class="position-relative">
+                    <div class="avatar-circle bg-primary text-white fw-bold d-flex align-items-center justify-content-center rounded-circle" style="width: 36px; height: 36px;">
+                        <i class="bi bi-headset fs-5"></i>
+                    </div>
+                    <span id="widgetOnlineDot" class="position-absolute bottom-0 end-0 p-1 bg-secondary border border-dark rounded-circle" style="width: 10px; height: 10px;"></span>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-white mb-0" style="font-size: 0.95rem;">SmartBank Support</h6>
+                    <small class="text-white-50" id="widgetOnlineText" style="font-size: 0.75rem;">Connecting...</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white btn-sm" id="btnCloseChatPanel" aria-label="Close"></button>
+        </div>
+
+        <!-- Message List Area -->
+        <div id="userWidgetMessages" class="flex-grow-1 p-3 overflow-auto d-flex flex-column gap-2" style="background: rgba(15, 23, 42, 0.75);">
+            <div class="text-center py-4 text-white-50 small" id="userWidgetLoading">
+                <div class="spinner-border spinner-border-sm text-info mb-1" role="status"></div>
+                <p class="mb-0">Loading chat history...</p>
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div id="userWidgetTyping" class="px-3 py-1 small text-info bg-dark bg-opacity-75 d-none">
+            <i class="bi bi-pencil-fill me-1 animate-pulse"></i> Support is typing...
+        </div>
+
+        <!-- Attachment Preview -->
+        <div id="userWidgetAttachmentPreview" class="px-3 py-2 bg-dark border-top border-secondary border-opacity-25 d-none align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2 text-white-50 small text-truncate">
+                <i class="bi bi-paperclip text-info"></i>
+                <span id="userWidgetFileName">file.png</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0" id="btnRemoveUserAttachment">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+        </div>
+
+        <!-- Input Bar -->
+        <div class="p-3 bg-dark bg-opacity-90 border-top border-secondary border-opacity-25">
+            <form id="userWidgetSendForm" class="d-flex align-items-center gap-2">
+                <input type="file" id="userWidgetFileInput" class="d-none" accept=".jpg,.jpeg,.png,.pdf">
+                <button type="button" class="btn btn-outline-secondary text-white-50 border-0 fs-5 p-1" id="btnUserAttach" title="Attach JPG, PNG, PDF">
+                    <i class="bi bi-paperclip"></i>
+                </button>
+                <input type="text" id="userWidgetInput" class="form-control bg-dark border-secondary text-white py-2 px-3 text-sm" placeholder="Ask support a question..." autocomplete="off">
+                <button type="submit" class="btn btn-primary px-3 py-2 d-flex align-items-center gap-1" id="btnUserSend">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .glass-chat-panel {
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        #smartbankChatBubble {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        #smartbankChatBubble:hover {
+            transform: scale(1.08);
+            box-shadow: 0 8px 24px rgba(13, 110, 253, 0.5) !important;
+        }
+        .user-bubble-user {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .user-bubble-admin {
+            background: rgba(30, 41, 59, 0.9);
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .widget-msg {
+            max-width: 82%;
+            border-radius: 14px;
+            padding: 8px 14px;
+            font-size: 0.88rem;
+            word-break: break-word;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const bubble = document.getElementById("smartbankChatBubble");
+            const panel = document.getElementById("smartbankChatPanel");
+            const btnClose = document.getElementById("btnCloseChatPanel");
+            const messagesContainer = document.getElementById("userWidgetMessages");
+            const msgInput = document.getElementById("userWidgetInput");
+            const btnSend = document.getElementById("btnUserSend");
+            const btnAttach = document.getElementById("btnUserAttach");
+            const fileInput = document.getElementById("userWidgetFileInput");
+            const previewBar = document.getElementById("userWidgetAttachmentPreview");
+            const previewFileName = document.getElementById("userWidgetFileName");
+            const btnRemoveAttachment = document.getElementById("btnRemoveUserAttachment");
+            const typingIndicator = document.getElementById("userWidgetTyping");
+            const unreadBadge = document.getElementById("chatWidgetUnreadBadge");
+            const onlineDot = document.getElementById("widgetOnlineDot");
+            const onlineText = document.getElementById("widgetOnlineText");
+            const bubbleIcon = document.getElementById("chatBubbleIcon");
+
+            let conversationId = null;
+            let selectedFile = null;
+            let isTyping = false;
+            let typingTimer = null;
+            let isOpen = localStorage.getItem("smartbank_chat_open") === "true";
+
+            // Request browser notification permission
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/chathub")
+                .withAutomaticReconnect()
+                .build();
+
+            // Set initial open state
+            if (isOpen) {
+                openPanel();
+            }
+
+            // Initialize conversation & history
+            initConversation();
+
+            // SignalR Connection
+            connection.start().then(function() {
+                onlineDot.className = "position-absolute bottom-0 end-0 p-1 bg-success border border-dark rounded-circle";
+                onlineText.innerText = "Support Online";
+            }).catch(function(err) {
+                console.error("SignalR User Hub Error: ", err);
+                onlineDot.className = "position-absolute bottom-0 end-0 p-1 bg-secondary border border-dark rounded-circle";
+                onlineText.innerText = "Offline";
+            });
+
+            // SignalR events
+            connection.on("ReceiveMessage", function(msg) {
+                appendUserWidgetMessage(msg);
+                scrollToBottom();
+
+                if (!isOpen) {
+                    playWidgetTone();
+                    showBrowserNotification(msg);
+                } else if (conversationId) {
+                    connection.invoke("MarkAsRead", conversationId).catch(console.error);
+                }
+            });
+
+            connection.on("MessageRead", function(convId, role) {
+                if (convId === conversationId && role === "Admin") {
+                    document.querySelectorAll(".user-read-status").forEach(el => {
+                        el.className = "bi bi-check-all text-info user-read-status";
+                    });
+                }
+            });
+
+            connection.on("UserTyping", function(convId, role) {
+                if (role === "Admin") {
+                    typingIndicator.classList.remove("d-none");
+                }
+            });
+
+            connection.on("UserStoppedTyping", function(convId, role) {
+                if (role === "Admin") {
+                    typingIndicator.classList.add("d-none");
+                }
+            });
+
+            connection.on("UnreadCountUpdated", function(count) {
+                updateUnreadBadge(count);
+            });
+
+            // Toggle Panel
+            bubble.addEventListener("click", function() {
+                if (panel.classList.contains("d-none")) {
+                    openPanel();
+                } else {
+                    closePanel();
+                }
+            });
+
+            btnClose.addEventListener("click", function() {
+                closePanel();
+            });
+
+            function openPanel() {
+                panel.classList.remove("d-none");
+                panel.classList.add("d-flex");
+                isOpen = true;
+                localStorage.setItem("smartbank_chat_open", "true");
+                bubbleIcon.className = "bi bi-x-lg fs-4 text-white";
+                scrollToBottom();
+                if (conversationId) {
+                    connection.invoke("MarkAsRead", conversationId).catch(console.error);
+                }
+            }
+
+            function closePanel() {
+                panel.classList.remove("d-flex");
+                panel.classList.add("d-none");
+                isOpen = false;
+                localStorage.setItem("smartbank_chat_open", "false");
+                bubbleIcon.className = "bi bi-chat-dots-fill fs-4 text-white";
+            }
+
+            function initConversation() {
+                fetch("/Chat/UserConversation")
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success && res.data) {
+                            conversationId = res.data.conversationId;
+                            updateUnreadBadge(res.data.unreadCount);
+                            loadMessageHistory();
+                        }
+                    })
+                    .catch(err => console.error("Error init chat: ", err));
+            }
+
+            function loadMessageHistory() {
+                if (!conversationId) return;
+                fetch(`/Chat/Messages?conversationId=${conversationId}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) {
+                            renderWidgetMessages(res.data);
+                            scrollToBottom();
+                        }
+                    });
+            }
+
+            function renderWidgetMessages(messages) {
+                if (!messages || messages.length === 0) {
+                    messagesContainer.innerHTML = `
+                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white-50 text-center py-4">
+                            <i class="bi bi-headset fs-1 text-primary opacity-50 mb-2"></i>
+                            <p class="small mb-1 fw-bold text-white">How can we help you today?</p>
+                            <small class="opacity-75">Type a message below to chat with a SmartBank support agent.</small>
+                        </div>
+                    `;
+                    return;
+                }
+
+                messagesContainer.innerHTML = messages.map(m => createWidgetMsgHtml(m)).join('');
+            }
+
+            function appendUserWidgetMessage(m) {
+                const empty = messagesContainer.querySelector(".py-4");
+                if (empty) messagesContainer.innerHTML = "";
+                messagesContainer.insertAdjacentHTML("beforeend", createWidgetMsgHtml(m));
+            }
+
+            function createWidgetMsgHtml(m) {
+                const isMe = m.senderRole === "User";
+                return `
+                    <div class="d-flex flex-column ${isMe ? 'align-items-end' : 'align-items-start'}">
+                        <div class="widget-msg ${isMe ? 'user-bubble-user' : 'user-bubble-admin'}">
+                            ${!isMe ? `<div class="fw-bold text-info mb-1" style="font-size: 0.72rem;">SmartBank Support</div>` : ''}
+                            ${m.messageText ? `<div>${escapeHtml(m.messageText)}</div>` : ''}
+                            ${renderWidgetAttachment(m.attachmentUrl)}
+                            <div class="d-flex align-items-center justify-content-end gap-1 mt-1 opacity-75" style="font-size: 0.68rem;">
+                                <span>${formatWidgetTime(m.sentAt)}</span>
+                                ${isMe ? `<i class="bi ${m.isRead ? 'bi-check-all text-info' : 'bi-check'} user-read-status"></i>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderWidgetAttachment(url) {
+                if (!url) return '';
+                const isImg = url.match(/\.(jpg|jpeg|png)$/i);
+                if (isImg) {
+                    return `<div class="mt-1"><a href="${url}" target="_blank"><img src="${url}" style="max-width: 180px; max-height: 140px; border-radius: 6px;" alt="Attachment"></a></div>`;
+                }
+                return `<div class="mt-1"><a href="${url}" target="_blank" class="btn btn-sm btn-dark text-info border-secondary py-1 px-2 text-xs d-inline-flex align-items-center gap-1"><i class="bi bi-file-pdf"></i> Attachment PDF</a></div>`;
+            }
+
+            // Typing handler
+            msgInput.addEventListener("input", function() {
+                if (!conversationId) return;
+                if (!isTyping) {
+                    isTyping = true;
+                    connection.invoke("Typing", conversationId).catch(console.error);
+                }
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(function() {
+                    isTyping = false;
+                    connection.invoke("StopTyping", conversationId).catch(console.error);
+                }, 2000);
+            });
+
+            // Attachment trigger
+            btnAttach.addEventListener("click", () => fileInput.click());
+            fileInput.addEventListener("change", function() {
+                if (fileInput.files.length > 0) {
+                    selectedFile = fileInput.files[0];
+                    previewFileName.innerText = selectedFile.name;
+                    previewBar.classList.remove("d-none");
+                    previewBar.classList.add("d-flex");
+                }
+            });
+            btnRemoveAttachment.addEventListener("click", function() {
+                selectedFile = null;
+                fileInput.value = "";
+                previewBar.classList.remove("d-flex");
+                previewBar.classList.add("d-none");
+            });
+
+            // Send Form
+            document.getElementById("userWidgetSendForm").addEventListener("submit", async function(e) {
+                e.preventDefault();
+                const text = msgInput.value.trim();
+                let attachmentUrl = null;
+
+                if (!text && !selectedFile) return;
+
+                btnSend.disabled = true;
+
+                if (selectedFile) {
+                    const formData = new FormData();
+                    formData.append("file", selectedFile);
+                    try {
+                        const uploadRes = await fetch("/Chat/UploadAttachment", {
+                            method: "POST",
+                            body: formData
+                        }).then(r => r.json());
+
+                        if (uploadRes.success) {
+                            attachmentUrl = uploadRes.url;
+                        } else {
+                            alert(uploadRes.message || "Upload failed.");
+                            btnSend.disabled = false;
+                            return;
+                        }
+                    } catch(e) {
+                        alert("Error uploading attachment.");
+                        btnSend.disabled = false;
+                        return;
+                    }
+                }
+
+                if (!conversationId) {
+                    const res = await fetch("/Chat/UserConversation").then(r => r.json());
+                    if (res.success) conversationId = res.data.conversationId;
+                }
+
+                connection.invoke("SendMessage", conversationId, text, attachmentUrl)
+                    .then(function() {
+                        msgInput.value = "";
+                        selectedFile = null;
+                        fileInput.value = "";
+                        previewBar.classList.remove("d-flex");
+                        previewBar.classList.add("d-none");
+                        btnSend.disabled = false;
+                        connection.invoke("StopTyping", conversationId).catch(console.error);
+                    })
+                    .catch(function(err) {
+                        alert("Error: " + err.toString());
+                        btnSend.disabled = false;
+                    });
+            });
+
+            function updateUnreadBadge(count) {
+                if (count > 0) {
+                    unreadBadge.innerText = count;
+                    unreadBadge.classList.remove("d-none");
+                } else {
+                    unreadBadge.classList.add("d-none");
+                }
+            }
+
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            function formatWidgetTime(utcStr) {
+                if (!utcStr) return '';
+                const d = new Date(utcStr);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+
+            function showBrowserNotification(msg) {
+                if ("Notification" in window && Notification.permission === "granted") {
+                    new Notification("SmartBank Support", {
+                        body: msg.messageText || "New attachment from Support",
+                        icon: "/favicon.ico"
+                    });
+                }
+            }
+
+            function playWidgetTone() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.04, ctx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.12);
+                } catch(e) {}
+            }
+        });
+    </script>
+}

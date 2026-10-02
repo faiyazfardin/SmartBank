@@ -1,0 +1,543 @@
+@{
+    ViewData["Title"] = "Support Chat Workspace";
+}
+
+<div class="container-fluid px-4 py-4">
+    <!-- Header banner -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="fw-bold text-white mb-1 d-flex align-items-center gap-2">
+                <i class="bi bi-chat-left-text-fill text-success fs-3"></i> Admin Support Chat Workspace
+            </h2>
+            <p class="text-white-50 mb-0">Manage and respond to real-time customer support inquiries across SmartBank.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-dark border border-secondary text-info px-3 py-2 rounded-pill d-flex align-items-center gap-2">
+                <span class="spinner-grow spinner-grow-sm text-success" id="signalrStatusDot" role="status"></span>
+                <span id="signalrStatusText">Connecting...</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Workspace Container -->
+    <div class="card glass-card border-0 shadow-lg overflow-hidden" style="min-height: 680px; max-height: calc(100vh - 180px);">
+        <div class="row g-0 h-100" style="min-height: 680px;">
+            
+            <!-- LEFT PANEL: Conversation List -->
+            <div class="col-lg-4 col-md-5 border-end border-secondary border-opacity-25 d-flex flex-column bg-dark bg-opacity-50">
+                <!-- Search bar -->
+                <div class="p-3 border-bottom border-secondary border-opacity-25">
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-white-50"><i class="bi bi-search"></i></span>
+                        <input type="text" id="convSearchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search customer name or account...">
+                    </div>
+                </div>
+
+                <!-- Conversation Cards List -->
+                <div class="flex-grow-1 overflow-auto p-2" id="conversationListContainer">
+                    <div class="text-center py-5 text-white-50" id="convListLoading">
+                        <div class="spinner-border spinner-border-sm text-info mb-2" role="status"></div>
+                        <p class="small mb-0">Loading support conversations...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Message Thread -->
+            <div class="col-lg-8 col-md-7 d-flex flex-column bg-dark bg-opacity-25 position-relative">
+                
+                <!-- Active Chat Header -->
+                <div class="p-3 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between bg-dark bg-opacity-60" id="chatHeader" style="min-height: 70px;">
+                    <div class="d-flex align-items-center gap-3" id="activeUserDetail">
+                        <div class="avatar-circle bg-secondary bg-opacity-25 text-white fw-bold d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;">
+                            <i class="bi bi-person-fill fs-4 text-white-50"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold text-white mb-0">Select a conversation</h6>
+                            <small class="text-white-50">Choose a user thread from the left panel to begin chatting.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messages Container -->
+                <div class="flex-grow-1 overflow-auto p-4 d-flex flex-column gap-3" id="messagesContainer" style="background: rgba(15, 23, 42, 0.4);">
+                    <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white-50 py-5">
+                        <i class="bi bi-chat-dots fs-1 text-secondary opacity-50 mb-3"></i>
+                        <p class="mb-0">No active conversation selected.</p>
+                    </div>
+                </div>
+
+                <!-- Typing indicator banner -->
+                <div class="px-4 py-1 small text-info d-none bg-dark bg-opacity-75" id="adminTypingIndicator">
+                    <i class="bi bi-pencil-fill me-1 animate-pulse"></i> Customer is typing...
+                </div>
+
+                <!-- Attachment Preview Bar -->
+                <div class="px-4 py-2 bg-dark border-top border-secondary border-opacity-25 d-none align-items-center justify-content-between" id="adminAttachmentPreviewBar">
+                    <div class="d-flex align-items-center gap-2 text-white-50 small text-truncate">
+                        <i class="bi bi-paperclip text-info"></i>
+                        <span id="adminAttachmentFileName">file.png</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0" id="btnRemoveAdminAttachment">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </div>
+
+                <!-- Chat Input Bar -->
+                <div class="p-3 border-top border-secondary border-opacity-25 bg-dark bg-opacity-80">
+                    <form id="adminSendForm" class="d-flex align-items-center gap-2">
+                        <input type="file" id="adminFileInput" class="d-none" accept=".jpg,.jpeg,.png,.pdf">
+                        <button type="button" class="btn btn-outline-secondary text-white-50 border-0 fs-5" id="btnAdminAttach" disabled title="Attach File (JPG, PNG, PDF)">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                        <input type="text" id="adminMessageInput" class="form-control bg-dark border-secondary text-white py-2 px-3" placeholder="Type your response to customer..." autocomplete="off" disabled>
+                        <button type="submit" class="btn btn-success px-4 py-2 d-flex align-items-center gap-2 fw-semibold" id="btnAdminSend" disabled>
+                            <span>Send</span>
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    .glass-card {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .conv-item {
+        transition: all 0.2s ease;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+    .conv-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .conv-item.active {
+        background: rgba(16, 185, 129, 0.15) !important;
+        border-left: 4px solid #10b981;
+    }
+    .msg-bubble {
+        max-width: 75%;
+        border-radius: 16px;
+        padding: 10px 16px;
+        font-size: 0.93rem;
+        word-wrap: break-word;
+    }
+    .msg-user {
+        background: rgba(30, 41, 59, 0.85);
+        color: #f1f5f9;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+    }
+    .msg-admin {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: #ffffff;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+    }
+    .msg-img-preview {
+        max-width: 240px;
+        max-height: 200px;
+        border-radius: 8px;
+        object-fit: cover;
+        cursor: pointer;
+    }
+    .online-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .online-indicator.online { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+    .online-indicator.offline { background-color: #64748b; }
+</style>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let conversations = [];
+            let activeConvId = null;
+            let activeUserId = null;
+            let selectedFile = null;
+            let typingTimer = null;
+            let isTyping = false;
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/chathub")
+                .withAutomaticReconnect()
+                .build();
+
+            // DOM elements
+            const convContainer = document.getElementById("conversationListContainer");
+            const messagesContainer = document.getElementById("messagesContainer");
+            const chatHeader = document.getElementById("chatHeader");
+            const msgInput = document.getElementById("adminMessageInput");
+            const btnSend = document.getElementById("btnAdminSend");
+            const btnAttach = document.getElementById("btnAdminAttach");
+            const fileInput = document.getElementById("adminFileInput");
+            const previewBar = document.getElementById("adminAttachmentPreviewBar");
+            const previewFileName = document.getElementById("adminAttachmentFileName");
+            const btnRemoveAttachment = document.getElementById("btnRemoveAdminAttachment");
+            const typingIndicator = document.getElementById("adminTypingIndicator");
+            const searchInput = document.getElementById("convSearchInput");
+            const statusDot = document.getElementById("signalrStatusDot");
+            const statusText = document.getElementById("signalrStatusText");
+
+            // Load conversations on init
+            loadConversations();
+
+            // Connect SignalR
+            connection.start().then(function () {
+                statusDot.className = "spinner-grow spinner-grow-sm text-success";
+                statusText.innerText = "Online";
+            }).catch(function (err) {
+                console.error("SignalR Connection Error: ", err);
+                statusDot.className = "spinner-grow spinner-grow-sm text-danger";
+                statusText.innerText = "Disconnected";
+            });
+
+            // SignalR Event Handlers
+            connection.on("ReceiveMessage", function(msg) {
+                // If message belongs to active thread, append
+                if (activeConvId && msg.conversationId === activeConvId) {
+                    appendMessage(msg);
+                    scrollToBottom();
+                    // Mark as read immediately
+                    connection.invoke("MarkAsRead", activeConvId).catch(console.error);
+                }
+                // Refresh list preview
+                loadConversations();
+                playNotificationSound();
+            });
+
+            connection.on("MessageRead", function(convId, role) {
+                if (activeConvId === convId) {
+                    document.querySelectorAll(".read-status-icon").forEach(el => {
+                        el.className = "bi bi-check-all text-info read-status-icon";
+                    });
+                }
+            });
+
+            connection.on("UserTyping", function(convId, role) {
+                if (activeConvId === convId && role === "User") {
+                    typingIndicator.classList.remove("d-none");
+                }
+            });
+
+            connection.on("UserStoppedTyping", function(convId, role) {
+                if (activeConvId === convId && role === "User") {
+                    typingIndicator.classList.add("d-none");
+                }
+            });
+
+            connection.on("UserOnline", function(userId, role) {
+                updateUserStatusInList(userId, true);
+            });
+
+            connection.on("UserOffline", function(userId, role) {
+                updateUserStatusInList(userId, false);
+            });
+
+            connection.on("UnreadCountUpdated", function(totalUnread) {
+                const navBadge = document.getElementById("adminNavUnreadBadge");
+                if (navBadge) {
+                    if (totalUnread > 0) {
+                        navBadge.innerText = totalUnread;
+                        navBadge.classList.remove("d-none");
+                    } else {
+                        navBadge.classList.add("d-none");
+                    }
+                }
+            });
+
+            // Search filter
+            searchInput.addEventListener("input", function() {
+                renderConversations();
+            });
+
+            function loadConversations() {
+                fetch("/Chat/AdminConversations")
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success) {
+                            conversations = res.data;
+                            renderConversations();
+                        }
+                    })
+                    .catch(err => console.error("Error loading conversations: ", err));
+            }
+
+            function renderConversations() {
+                const query = searchInput.value.toLowerCase().trim();
+                const filtered = conversations.filter(c => 
+                    c.userName.toLowerCase().includes(query) || 
+                    c.userEmail.toLowerCase().includes(query) || 
+                    (c.accountNumber && c.accountNumber.includes(query))
+                );
+
+                if (filtered.length === 0) {
+                    convContainer.innerHTML = `<div class="text-center py-5 text-white-50"><p class="small mb-0">No conversations found.</p></div>`;
+                    return;
+                }
+
+                convContainer.innerHTML = filtered.map(c => `
+                    <div class="conv-item p-3 mb-2 ${activeConvId === c.conversationId ? 'active' : ''}" data-conv-id="${c.conversationId}" data-user-id="${c.userId}">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                                <span class="online-indicator ${c.isOnline ? 'online' : 'offline'}" id="status-ind-${c.userId}"></span>
+                                <h6 class="fw-bold text-white mb-0 text-truncate">${escapeHtml(c.userName)}</h6>
+                            </div>
+                            <small class="text-white-50" style="font-size: 0.75rem;">${formatTime(c.lastMessageAt || c.startedAt)}</small>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <p class="text-white-50 small mb-0 text-truncate me-2" style="max-width: 200px;">
+                                ${escapeHtml(c.lastMessagePreview || 'Started conversation')}
+                            </p>
+                            ${c.unreadCount > 0 ? `<span class="badge bg-danger rounded-pill">${c.unreadCount}</span>` : ''}
+                        </div>
+                        ${c.accountNumber ? `<small class="text-info opacity-75" style="font-size: 0.72rem;">A/C: ${c.accountNumber}</small>` : ''}
+                    </div>
+                `).join('');
+
+                document.querySelectorAll(".conv-item").forEach(item => {
+                    item.addEventListener("click", function() {
+                        const convId = this.getAttribute("data-conv-id");
+                        const userId = this.getAttribute("data-user-id");
+                        selectConversation(convId, userId);
+                    });
+                });
+            }
+
+            function selectConversation(convId, userId) {
+                activeConvId = convId;
+                activeUserId = userId;
+                renderConversations();
+
+                const conv = conversations.find(c => c.conversationId === convId);
+
+                // Enable input controls
+                msgInput.disabled = false;
+                btnSend.disabled = false;
+                btnAttach.disabled = false;
+                msgInput.focus();
+
+                // Render Header
+                document.getElementById("activeUserDetail").innerHTML = `
+                    <div class="avatar-circle bg-success text-white fw-bold d-flex align-items-center justify-content-center rounded-circle" style="width: 44px; height: 44px;">
+                        ${conv ? conv.userName.substring(0, 1).toUpperCase() : 'U'}
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="fw-bold text-white mb-0">${escapeHtml(conv?.userName || 'Customer')}</h6>
+                            <span class="online-indicator ${conv?.isOnline ? 'online' : 'offline'}" id="activeHeaderStatus"></span>
+                            <small class="text-white-50">${conv?.isOnline ? 'Online' : 'Offline'}</small>
+                        </div>
+                        <small class="text-info">${conv?.userEmail || ''} ${conv?.accountNumber ? '| A/C: ' + conv.accountNumber : ''}</small>
+                    </div>
+                `;
+
+                // Fetch messages
+                fetch(`/Chat/Messages?conversationId=${convId}`)
+                    .then(res => res.json())
+                    .then(res => {
+                        if (res.success) {
+                            renderMessages(res.data);
+                            scrollToBottom();
+                            // Mark as read in Hub
+                            connection.invoke("MarkAsRead", convId).catch(console.error);
+                            // Clear unread count locally
+                            if (conv) conv.unreadCount = 0;
+                            renderConversations();
+                        }
+                    });
+            }
+
+            function renderMessages(messages) {
+                if (!messages || messages.length === 0) {
+                    messagesContainer.innerHTML = `
+                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-white-50 py-5">
+                            <i class="bi bi-chat-square-text fs-2 mb-2 text-info opacity-50"></i>
+                            <p class="small mb-0">No messages in this thread yet.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                messagesContainer.innerHTML = messages.map(m => createMessageHtml(m)).join('');
+            }
+
+            function appendMessage(m) {
+                const emptyPlaceholder = messagesContainer.querySelector(".py-5");
+                if (emptyPlaceholder) {
+                    messagesContainer.innerHTML = "";
+                }
+                messagesContainer.insertAdjacentHTML("beforeend", createMessageHtml(m));
+            }
+
+            function createMessageHtml(m) {
+                const isAdmin = m.senderRole === "Admin";
+                return `
+                    <div class="d-flex flex-column ${isAdmin ? 'align-items-end' : 'align-items-start'}">
+                        <div class="msg-bubble ${isAdmin ? 'msg-admin' : 'msg-user'}">
+                            ${m.messageText ? `<div>${escapeHtml(m.messageText)}</div>` : ''}
+                            ${renderAttachment(m.attachmentUrl)}
+                            <div class="d-flex align-items-center justify-content-end gap-1 mt-1 opacity-75" style="font-size: 0.7rem;">
+                                <span>${formatTime(m.sentAt)}</span>
+                                ${isAdmin ? `<i class="bi ${m.isRead ? 'bi-check-all text-info' : 'bi-check'} read-status-icon"></i>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderAttachment(url) {
+                if (!url) return '';
+                const isImg = url.match(/\.(jpg|jpeg|png)$/i);
+                if (isImg) {
+                    return `<div class="mt-2"><a href="${url}" target="_blank"><img src="${url}" class="msg-img-preview border border-secondary shadow-sm" alt="Attachment"></a></div>`;
+                }
+                return `<div class="mt-2"><a href="${url}" target="_blank" class="btn btn-sm btn-dark text-info border-secondary d-inline-flex align-items-center gap-1"><i class="bi bi-file-earmark-pdf-fill"></i> View Attachment</a></div>`;
+            }
+
+            function updateUserStatusInList(userId, isOnline) {
+                const conv = conversations.find(c => c.userId === userId);
+                if (conv) {
+                    conv.isOnline = isOnline;
+                    renderConversations();
+                }
+                if (activeUserId === userId) {
+                    const headerStatus = document.getElementById("activeHeaderStatus");
+                    if (headerStatus) {
+                        headerStatus.className = `online-indicator ${isOnline ? 'online' : 'offline'}`;
+                        headerStatus.nextElementSibling.innerText = isOnline ? 'Online' : 'Offline';
+                    }
+                }
+            }
+
+            // Input Typing event
+            msgInput.addEventListener("input", function() {
+                if (!activeConvId) return;
+                if (!isTyping) {
+                    isTyping = true;
+                    connection.invoke("Typing", activeConvId).catch(console.error);
+                }
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(function() {
+                    isTyping = false;
+                    connection.invoke("StopTyping", activeConvId).catch(console.error);
+                }, 2000);
+            });
+
+            // Attachment trigger
+            btnAttach.addEventListener("click", function() {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener("change", function() {
+                if (fileInput.files.length > 0) {
+                    selectedFile = fileInput.files[0];
+                    previewFileName.innerText = selectedFile.name;
+                    previewBar.classList.remove("d-none");
+                    previewBar.classList.add("d-flex");
+                }
+            });
+
+            btnRemoveAttachment.addEventListener("click", function() {
+                selectedFile = null;
+                fileInput.value = "";
+                previewBar.classList.remove("d-flex");
+                previewBar.classList.add("d-none");
+            });
+
+            // Form Submit
+            document.getElementById("adminSendForm").addEventListener("submit", async function(e) {
+                e.preventDefault();
+                if (!activeConvId) return;
+
+                const text = msgInput.value.trim();
+                let attachmentUrl = null;
+
+                if (!text && !selectedFile) return;
+
+                btnSend.disabled = true;
+
+                if (selectedFile) {
+                    const formData = new FormData();
+                    formData.append("file", selectedFile);
+                    try {
+                        const uploadRes = await fetch("/Chat/UploadAttachment", {
+                            method: "POST",
+                            body: formData
+                        }).then(r => r.json());
+
+                        if (uploadRes.success) {
+                            attachmentUrl = uploadRes.url;
+                        } else {
+                            alert(uploadRes.message || "Failed to upload attachment.");
+                            btnSend.disabled = false;
+                            return;
+                        }
+                    } catch (err) {
+                        alert("File upload error.");
+                        btnSend.disabled = false;
+                        return;
+                    }
+                }
+
+                // Send via SignalR
+                connection.invoke("SendMessage", activeConvId, text, attachmentUrl)
+                    .then(function() {
+                        msgInput.value = "";
+                        selectedFile = null;
+                        fileInput.value = "";
+                        previewBar.classList.remove("d-flex");
+                        previewBar.classList.add("d-none");
+                        btnSend.disabled = false;
+                        connection.invoke("StopTyping", activeConvId).catch(console.error);
+                    })
+                    .catch(function(err) {
+                        alert("Error sending message: " + err.toString());
+                        btnSend.disabled = false;
+                    });
+            });
+
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            function formatTime(utcStr) {
+                if (!utcStr) return '';
+                const d = new Date(utcStr);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+
+            function playNotificationSound() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.15);
+                } catch(e) {}
+            }
+        });
+    </script>
+}
