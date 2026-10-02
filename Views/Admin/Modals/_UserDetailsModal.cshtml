@@ -1,0 +1,230 @@
+<!-- ========================================================================= -->
+<!-- MODAL: User Profile, Complete Transaction History & Instant Admin Deposit -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="userDetailsModal" tabindex="-1" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 shadow-2xl rounded-4 overflow-hidden" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.1) !important;">
+            <!-- Modal Header -->
+            <div class="modal-header bg-dark text-white border-secondary-subtle px-4 py-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold fs-5 shadow-sm" id="udModalAvatar" style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+                        U
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="fw-bold mb-0 text-white" id="udModalFullName">Customer Profile</h5>
+                            <span class="badge rounded-pill px-2.5 py-1 text-white fw-bold small" id="udModalRoleBadge" style="background: #6366f1;">Customer</span>
+                            <span class="badge rounded-pill px-2.5 py-1 fw-bold small" id="udModalStatusBadge">Active</span>
+                        </div>
+                        <div class="text-secondary small mt-0.5">
+                            <span class="font-monospace text-info fw-semibold" id="udModalUsername">@@username</span> &bull; 
+                            Member Since: <span class="text-white fw-semibold" id="udModalCreatedAt">—</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4" style="background: #0f172a;">
+                <!-- Row 1: Profile & Account Overview Cards -->
+                <div class="row g-3 mb-4">
+                    <!-- Contact & KYC Info -->
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 h-100" style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="fw-bold text-uppercase small text-primary mb-3">
+                                <i class="bi bi-person-badge me-1"></i> Contact &amp; KYC Identification
+                            </h6>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Email Address:</span>
+                                <strong class="text-white" id="udModalEmail">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Phone Number:</span>
+                                <strong class="text-white" id="udModalPhone">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>National ID (NID):</span>
+                                <strong class="text-warning font-monospace" id="udModalNid">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Failed Login Attempts:</span>
+                                <strong class="font-monospace" id="udModalFailedLogin">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-1 border-bottom border-secondary-subtle text-muted small">
+                                <span>Failed Vault Attempts:</span>
+                                <strong class="font-monospace" id="udModalFailedVault">—</strong>
+                            </div>
+                            <div class="d-flex justify-content-between pt-1 text-muted small">
+                                <span>User ID:</span>
+                                <strong class="text-secondary font-monospace" id="udModalUserId">#0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Banking Account & Balance Banner -->
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 h-100 position-relative overflow-hidden" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.35);">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-uppercase small fw-bold text-success" style="letter-spacing: 0.5px;">
+                                        <i class="bi bi-bank me-1"></i> Active Banking Account
+                                    </div>
+                                    <div class="font-monospace fw-bold text-white fs-6 mt-1" id="udModalAccNum">
+                                        100000000000
+                                    </div>
+                                </div>
+                                <span class="badge rounded-pill bg-success px-3 py-1 fw-bold small" id="udModalAccStatus">Active</span>
+                            </div>
+
+                            <div class="mt-3">
+                                <div class="text-secondary small fw-semibold">CURRENT LIVE BALANCE</div>
+                                <div class="fs-2 fw-extrabold text-success mt-0.5" id="udModalBalance">
+                                    ৳0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Score & Account Freeze Controls Banner -->
+                    <div class="col-12 mt-3">
+                        <div class="p-3 rounded-3 position-relative overflow-hidden" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(239, 68, 68, 0.35);">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white p-2" id="udModalRiskIcon" style="width: 44px; height: 44px; background: rgba(239, 68, 68, 0.2);">
+                                        <i class="bi bi-shield-exclamation fs-4 text-warning"></i>
+                                    </div>
+                                    <div>
+                                        <div class="small fw-bold text-secondary text-uppercase" style="letter-spacing: 0.5px;">SECURITY RISK SCORE &amp; REPUTATION</div>
+                                        <div class="d-flex align-items-center gap-2 mt-0.5">
+                                            <span class="fs-4 fw-extrabold text-white" id="udModalRiskScoreVal">0 pts</span>
+                                            <span class="badge rounded-pill px-3 py-1 fw-bold small" id="udModalRiskBadge">0 pts (Low)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2">
+                                    <!-- Unfreeze Form -->
+                                    <form asp-controller="Admin" asp-action="UnfreezeUser" method="post" class="d-inline" id="udUnfreezeForm">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="userId" id="udUnfreezeUserId" value="0" />
+                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm d-none" id="udBtnUnfreeze">
+                                            <i class="bi bi-sun-fill me-1"></i> Admin Unfreeze (Set Score 70)
+                                        </button>
+                                    </form>
+
+                                    <!-- Manual Adjust Score Trigger -->
+                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-semibold" onclick="openManualAdjustRiskModal()">
+                                        <i class="bi bi-sliders me-1"></i> Adjust Risk Score (+/-)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Instant Admin Add Money / Deposit Panel -->
+                <div class="p-3 rounded-3 mb-4" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(99, 102, 241, 0.35);">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                        <h6 class="fw-bold text-white mb-0">
+                            <i class="bi bi-cash-stack text-info me-1"></i> Admin Instant Deposit (Add Funds)
+                        </h6>
+                        <span class="small text-muted">Direct ledger credit &bull; No customer password required</span>
+                    </div>
+
+                    <div id="udDepositAlert" class="alert d-none small py-2 px-3 mb-2"></div>
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Deposit Amount (৳) *</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-dark border-secondary text-success fw-bold">৳</span>
+                                <input type="number" id="udDepositAmount" class="form-control form-control-sm fw-bold text-success fs-6" placeholder="0.00" min="1" step="0.01" />
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-semibold text-secondary mb-1">Deposit Reference / Memo</label>
+                            <input type="text" id="udDepositRef" class="form-control form-control-sm" placeholder="e.g. Cash Deposit / Admin Adjustment" />
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" id="udBtnDeposit" class="btn btn-sm btn-success w-100 fw-bold rounded-pill shadow-sm" onclick="submitAdminDepositFromModal()">
+                                <i class="bi bi-plus-circle-fill me-1"></i> Add Funds Now
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Preset Amount Pills -->
+                    <div class="d-flex align-items-center gap-1.5 mt-2 flex-wrap">
+                        <span class="small text-muted me-1" style="font-size: 0.75rem;">Quick Presets:</span>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(1000)">+৳1,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(5000)">+৳5,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(10000)">+৳10,000</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill small" onclick="setDepositPreset(50000)">+৳50,000</button>
+                    </div>
+                </div>
+
+                <!-- Row 3: Complete Transaction History Table -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-white mb-0">
+                        <i class="bi bi-clock-history text-primary me-1"></i> Complete Itemized Transaction Ledger
+                    </h6>
+                    <div style="width: 250px;">
+                        <input type="text" id="udTxSearch" class="form-control form-control-sm" placeholder="Filter transactions..." onkeyup="filterUserTransactions(this.value)" />
+                    </div>
+                </div>
+
+                <div class="table-responsive rounded-3 border border-secondary-subtle mb-4" style="max-height: 250px; overflow-y: auto;">
+                    <table class="table sb-table align-middle small mb-0" id="udTxTable">
+                        <thead class="sticky-top bg-dark">
+                            <tr>
+                                <th>Ref / Tx ID</th>
+                                <th>Type &amp; Operation</th>
+                                <th>Amount (৳)</th>
+                                <th>Date &amp; Time</th>
+                                <th>Related Account</th>
+                            </tr>
+                        </thead>
+                        <tbody id="udTxTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading transaction history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Row 4: Risk Event Audit History Table -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-bold text-white mb-0">
+                        <i class="bi bi-activity text-warning me-1"></i> Risk Event Audit History (Inc. Decay &amp; Anomalies)
+                    </h6>
+                </div>
+
+                <div class="table-responsive rounded-3 border border-secondary-subtle" style="max-height: 220px; overflow-y: auto;">
+                    <table class="table sb-table align-middle small mb-0" id="udRiskTable">
+                        <thead class="sticky-top bg-dark">
+                            <tr>
+                                <th>Timestamp (UTC)</th>
+                                <th>Event Type</th>
+                                <th>Points</th>
+                                <th>Score After</th>
+                            </tr>
+                        </thead>
+                        <tbody id="udRiskTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">
+                                    Loading risk audit events...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-dark border-secondary-subtle px-4 py-3">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

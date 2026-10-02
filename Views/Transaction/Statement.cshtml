@@ -206,7 +206,7 @@
                             <tr>
                                 <td class="text-nowrap text-white-50"><i class="bi bi-clock me-1 text-muted"></i>@tx.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td>
-                                    <span class="badge font-monospace px-2 py-1" style="background: rgba(255, 255, 255, 0.08); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">#TX-@tx.Id.ToString("D6")</span>
+                                    <span class="badge-tx-id">#TX-@tx.Id.ToString("D6")</span>
                                 </td>
                                 <td>
                                     @if (tx.Type == SmartBank.Entities.TransactionType.Deposit)
@@ -223,7 +223,7 @@
                                     }
                                     else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
                                     {
-                                        <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill me-1">
+                                        <span class="badge-transfer-in me-1">
                                             <i class="bi bi-arrow-down-left"></i> Transfer In
                                         </span>
                                     }

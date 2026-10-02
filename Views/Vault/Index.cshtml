@@ -85,9 +85,9 @@
                         <a asp-controller="Dashboard" asp-action="Index" class="text-secondary text-decoration-none">
                             <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
                         </a>
-                        <button type="button" class="btn btn-link btn-sm text-info text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#forgotVaultModal">
+                        <a asp-controller="Vault" asp-action="ForgotVaultPasswordStep1" class="btn btn-link btn-sm text-info text-decoration-none p-0">
                             Forgot Vault Password?
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -318,7 +318,7 @@
                                 var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
                                 <tr>
                                     <td>
-                                        <span class="badge font-monospace px-2 py-1" style="background: rgba(255, 255, 255, 0.08); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">
+                                        <span class="badge-tx-id">
                                             #TX-@tx.Id.ToString("D6")
                                         </span>
                                     </td>
@@ -333,7 +333,7 @@
                                         }
                                         else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
                                         {
-                                            <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill me-1"><i class="bi bi-arrow-down-left"></i> Transfer In</span>
+                                            <span class="badge-transfer-in me-1"><i class="bi bi-arrow-down-left"></i> Transfer In</span>
                                         }
                                         else
                                         {
@@ -396,6 +396,11 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link rounded-pill px-4 fw-semibold ms-2" id="tab-vault-pass" data-bs-toggle="pill" data-bs-target="#panel-vault-pass" type="button" role="tab">
                         <i class="bi bi-safe2 me-1"></i> Change Vault Password
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill px-4 fw-semibold ms-2" id="tab-security-question" data-bs-toggle="pill" data-bs-target="#panel-security-question" type="button" role="tab">
+                        <i class="bi bi-question-circle me-1"></i> Security Question
                     </button>
                 </li>
             </ul>
@@ -481,6 +486,42 @@
                         <div class="col-12">
                             <button type="submit" class="btn btn-sb-primary rounded-pill px-4 fw-semibold">
                                 <i class="bi bi-safe2 me-1"></i> Update Vault Password
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab 4: Change Security Question (PART D) -->
+                <div class="tab-pane fade" id="panel-security-question" role="tabpanel">
+                    <form asp-controller="Vault" asp-action="ChangeSecurityQuestion" method="post" class="row g-3" style="max-width: 600px;">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">Current Security Vault Password</label>
+                            <input type="password" name="currentVaultPassword" class="form-control" placeholder="Enter current vault password to authorize change" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">New Security Question</label>
+                            <select name="securityQuestion" id="tabSqSelect" class="form-select" required>
+                                <option value="">-- Choose a Security Question --</option>
+                                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                                <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                                <option value="What was the name of your primary school?">What was the name of your primary school?</option>
+                                <option value="In what city were you born?">In what city were you born?</option>
+                                <option value="What is your favorite book or movie?">What is your favorite book or movie?</option>
+                                <option value="Other">Other (Write Custom Question)</option>
+                            </select>
+                        </div>
+                        <div class="col-12 d-none" id="tabSqCustomContainer">
+                            <label class="form-label small fw-semibold text-secondary">Custom Security Question</label>
+                            <input type="text" name="customSecurityQuestion" id="tabSqCustomInput" class="form-control" placeholder="Type custom security question" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary">New Secret Answer</label>
+                            <input type="text" name="securityAnswer" class="form-control" placeholder="Enter new secret answer" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sb-primary rounded-pill px-4 fw-semibold">
+                                <i class="bi bi-shield-check me-1"></i> Update Security Question
                             </button>
                         </div>
                     </form>
@@ -599,29 +640,92 @@
             }
         }
 
-        // Live Countdown Timer for Active Vault Session
+        // Live Countdown Timer for Active Vault Session & PART B Locking Conditions
         const isVaultUnlocked = @(isUnlocked ? "true" : "false");
-        const sessionTimeoutSec = @sessionTimeoutSeconds;
+        const sessionTimeoutSec = @sessionTimeoutSeconds; // 60s (1 min)
         if (isVaultUnlocked) {
             (function () {
                 let remaining = sessionTimeoutSec;
                 const timerEl = document.getElementById("vaultSessionTimer");
-                if (timerEl) {
-                    const timerInterval = setInterval(function () {
-                        remaining--;
-                        if (remaining <= 0) {
-                            clearInterval(timerInterval);
-                            timerEl.innerText = "00:00";
-                            window.location.reload();
-                            return;
-                        }
+
+                function updateDisplay() {
+                    if (timerEl) {
                         const m = Math.floor(remaining / 60).toString().padStart(2, '0');
                         const s = (remaining % 60).toString().padStart(2, '0');
                         timerEl.innerText = m + ":" + s;
-                    }, 1000);
+                    }
+                }
+
+                // Inactivity timer reset
+                let idleTimer;
+                function resetIdleTimer() {
+                    remaining = sessionTimeoutSec;
+                    updateDisplay();
+                }
+
+                ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+                    document.addEventListener(evt, resetIdleTimer, { passive: true });
+                });
+
+                const timerInterval = setInterval(function () {
+                    remaining--;
+                    if (remaining <= 0) {
+                        clearInterval(timerInterval);
+                        if (timerEl) timerEl.innerText = "00:00";
+                        lockVaultSilently();
+                        return;
+                    }
+                    updateDisplay();
+                }, 1000);
+
+                // PART B — Condition 2: TAB SWITCH / NAVIGATE AWAY -> Lock immediately
+                document.addEventListener('visibilitychange', function () {
+                    if (document.hidden) {
+                        lockVaultSilently();
+                    }
+                });
+
+                window.addEventListener('pagehide', function () {
+                    lockVaultSilently();
+                });
+
+                function lockVaultSilently() {
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || "";
+                    if (navigator.sendBeacon) {
+                        const formData = new FormData();
+                        formData.append('__RequestVerificationToken', token);
+                        navigator.sendBeacon('/Vault/Lock', formData);
+                    } else {
+                        fetch('/Vault/Lock', {
+                            method: 'POST',
+                            headers: { 'RequestVerificationToken': token },
+                            keepalive: true
+                        });
+                    }
+                    window.location.reload();
                 }
             })();
         }
+
+        // Custom Security Question toggle for Tab 4
+        document.addEventListener('DOMContentLoaded', function () {
+            const sqSelect = document.getElementById('tabSqSelect');
+            const sqCustomContainer = document.getElementById('tabSqCustomContainer');
+            const sqCustomInput = document.getElementById('tabSqCustomInput');
+
+            if (sqSelect) {
+                sqSelect.addEventListener('change', function () {
+                    if (this.value === 'Other') {
+                        sqCustomContainer.classList.remove('d-none');
+                        sqCustomInput.required = true;
+                    } else {
+                        sqCustomContainer.classList.add('d-none');
+                        sqCustomInput.required = false;
+                        sqCustomInput.value = '';
+                    }
+                });
+            }
+        });
 
         // Lockout countdown timer
         const isVaultLockedOut = @(isLockedOut ? "true" : "false");

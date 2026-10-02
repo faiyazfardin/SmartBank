@@ -1,0 +1,100 @@
+@model SmartBank.ViewModels.ForceSecurityQuestionSetupViewModel
+@{
+    ViewData["Title"] = "Security Setup Required — SmartBank";
+}
+
+<div class="auth-wrapper py-5">
+    <div class="auth-card-pro" style="max-width: 540px;">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <div class="brand-icon-box mx-auto mb-3 shadow-glow" style="width: 58px; height: 58px; font-size: 1.6rem; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3);">
+                <i class="bi bi-shield-lock-fill text-info"></i>
+            </div>
+            <h3 class="fw-bold text-white mb-1 tracking-tight">Set Security Question</h3>
+            <p class="text-secondary small mb-0">To ensure recovery for your Security Vault, please configure your security question and secret answer before continuing.</p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger bg-danger bg-opacity-10 border border-danger border-opacity-25 text-danger alert-dismissible fade show d-flex align-items-center mb-4 rounded-3" role="alert">
+                <i class="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                <div class="small fw-semibold">@ViewBag.Error</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form asp-controller="Account" asp-action="ForceSecurityQuestionSetup" method="post" id="securitySetupForm">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Select Security Question</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-question-circle text-info"></i></span>
+                    <select asp-for="SecurityQuestion" id="selectQuestion" class="form-select" required>
+                        <option value="">-- Choose a Security Question --</option>
+                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                        <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                        <option value="What was the name of your primary school?">What was the name of your primary school?</option>
+                        <option value="In what city were you born?">In what city were you born?</option>
+                        <option value="What is your favorite book or movie?">What is your favorite book or movie?</option>
+                        <option value="Other">Other (Write Custom Question)</option>
+                    </select>
+                </div>
+                <span asp-validation-for="SecurityQuestion" class="text-danger small"></span>
+            </div>
+
+            <!-- Custom Question Input (Visible when "Other" selected) -->
+            <div class="mb-3 d-none" id="customQuestionContainer">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Custom Question</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-pencil text-warning"></i></span>
+                    <input type="text" asp-for="CustomSecurityQuestion" id="inputCustomQuestion" class="form-control" placeholder="Type your custom security question" />
+                </div>
+                <span asp-validation-for="CustomSecurityQuestion" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold small text-light opacity-90 mb-1">Secret Answer</label>
+                <div class="input-group auth-input-group">
+                    <span class="input-group-text"><i class="bi bi-key-fill text-success"></i></span>
+                    <input type="text" asp-for="SecurityAnswer" class="form-control" placeholder="Enter your secret answer" required />
+                </div>
+                <div class="form-text small text-secondary">
+                    <i class="bi bi-info-circle me-1"></i> Answers are stored securely (hashed) and are case-insensitive.
+                </div>
+                <span asp-validation-for="SecurityAnswer" class="text-danger small"></span>
+            </div>
+
+            <button type="submit" id="submitSetupBtn" class="btn-cta-primary w-100 py-2-5 fw-bold shadow-glow mb-3">
+                <i class="bi bi-check-circle-fill me-2"></i> Save Security Question &amp; Continue
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const selectQ = document.getElementById('selectQuestion');
+            const customContainer = document.getElementById('customQuestionContainer');
+            const customInput = document.getElementById('inputCustomQuestion');
+
+            function toggleCustom() {
+                if (selectQ.value === 'Other') {
+                    customContainer.classList.remove('d-none');
+                    customInput.required = true;
+                } else {
+                    customContainer.classList.add('d-none');
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            }
+
+            if (selectQ) {
+                selectQ.addEventListener('change', toggleCustom);
+                toggleCustom();
+            }
+        });
+    </script>
+}
