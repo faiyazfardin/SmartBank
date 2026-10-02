@@ -17,13 +17,16 @@ namespace SmartBank.Controllers
     {
         private readonly SmartBankDbContext _context;
         private readonly IOtpTransactionService _otpTransactionService;
+        private readonly IRiskService _riskService;
 
         public TransactionController(
             SmartBankDbContext context,
-            IOtpTransactionService otpTransactionService)
+            IOtpTransactionService otpTransactionService,
+            IRiskService riskService)
         {
             _context = context;
             _otpTransactionService = otpTransactionService;
+            _riskService = riskService;
         }
 
         private int GetCurrentUserId()
@@ -113,9 +116,22 @@ namespace SmartBank.Controllers
         // POST: Transaction/Withdraw -> Initiates Pending Transaction & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Withdraw(decimal amount)
+        public async Task<IActionResult> Withdraw(decimal amount, string? vaultPassword)
         {
             var userId = GetCurrentUserId();
+
+            var stepUpResult = await _riskService.EvaluateTransactionStepUpAsync(
+                userId,
+                amount,
+                providedVaultPassword: vaultPassword,
+                clientIp: HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            if (stepUpResult.StepUpRequired && !stepUpResult.TransactionAllowed)
+            {
+                TempData["ErrorToast"] = stepUpResult.Message;
+                return RedirectToAction("Withdraw");
+            }
+
             var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
                 TransactionType = "Withdraw",
@@ -149,9 +165,24 @@ namespace SmartBank.Controllers
         // POST: Transaction/Transfer -> Initiates Pending Transfer & Dispatches OTP
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount, string? memo)
+        public async Task<IActionResult> Transfer(string recipientAccountNumber, decimal amount, string? memo, string? vaultPassword)
         {
             var userId = GetCurrentUserId();
+
+            // Evaluate Risk & Large Transaction Step-up auth
+            var stepUpResult = await _riskService.EvaluateTransactionStepUpAsync(
+                userId,
+                amount,
+                providedVaultPassword: vaultPassword,
+                recipientInfo: recipientAccountNumber,
+                clientIp: HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            if (stepUpResult.StepUpRequired && !stepUpResult.TransactionAllowed)
+            {
+                TempData["ErrorToast"] = stepUpResult.Message;
+                return RedirectToAction("Transfer");
+            }
+
             var (statusCode, response) = await _otpTransactionService.InitiateTransactionAsync(userId, new TransactionRequestDto
             {
                 TransactionType = "Transfer",

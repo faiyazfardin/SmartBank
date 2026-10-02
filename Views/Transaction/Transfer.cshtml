@@ -77,12 +77,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Reference / Memo Note (Optional)</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light"><i class="bi bi-chat-left-text"></i></span>
                             <input type="text" name="memo" class="form-control" placeholder="e.g. Monthly rent, Project fee, Gift" />
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold text-secondary small">
+                            Security Vault Password <span class="text-muted fw-normal">(Step-Up Auth for Large Tx &gt;5x Avg)</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-shield-lock-fill text-warning"></i></span>
+                            <input type="password" name="vaultPassword" class="form-control" placeholder="Enter Vault Password if transferring large amount" />
+                        </div>
+                        <div class="form-text small text-muted">Required if transfer amount exceeds 5x your 30-day average.</div>
                     </div>
 
                     <div class="d-flex gap-2">

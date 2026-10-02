@@ -37,5 +37,17 @@ namespace SmartBank.ViewModels
         [Display(Name = "Confirm New Vault Password")]
         [DataType(DataType.Password)]
         public string ConfirmVaultPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Security Question is required")]
+        [Display(Name = "Security Question")]
+        public string SecurityQuestion { get; set; } = string.Empty;
+
+        [Display(Name = "Custom Security Question")]
+        public string? CustomSecurityQuestion { get; set; }
+
+        [Required(ErrorMessage = "Secret Answer is required")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Secret answer must be at least 2 characters long")]
+        [Display(Name = "Secret Answer")]
+        public string SecurityAnswer { get; set; } = string.Empty;
     }
 }

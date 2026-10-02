@@ -58,6 +58,12 @@ namespace SmartBank.Entities
 
         public DateTime? VaultPasswordSetAt { get; set; }
 
+        [MaxLength(255)]
+        public string? SecurityQuestion { get; set; }
+
+        [MaxLength(256)]
+        public string? SecurityAnswerHash { get; set; }
+
         public int FailedVaultAttempts { get; set; } = 0;
 
         public DateTime? VaultLockedUntil { get; set; }
@@ -65,6 +71,8 @@ namespace SmartBank.Entities
         public bool IsFirstLogin { get; set; } = true;
 
         public DateTime? LastVaultUnlockAt { get; set; }
+
+        public int RiskScore { get; set; } = 0;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -77,5 +85,6 @@ namespace SmartBank.Entities
         public virtual ICollection<ExternalLogin> ExternalLogins { get; set; } = new List<ExternalLogin>();
         public virtual ICollection<OtpChallenge> OtpChallenges { get; set; } = new List<OtpChallenge>();
         public virtual ICollection<TransferRequest> TransferRequests { get; set; } = new List<TransferRequest>();
+        public virtual ICollection<RiskEvent> RiskEvents { get; set; } = new List<RiskEvent>();
     }
 }

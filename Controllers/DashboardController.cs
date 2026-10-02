@@ -47,6 +47,7 @@ namespace SmartBank.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Accounts)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null || user.Status == "Pending" || user.Status == "Suspended" || user.Status == "Rejected")

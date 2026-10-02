@@ -64,7 +64,7 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-submit-otp btn-lg w-100 rounded-3 shadow-sm mb-3">
+        <button type="submit" class="btn btn-submit-otp btn-lg w-100 rounded-3 shadow-sm mb-3" id="btnSubmitModalOtp">
             <i class="bi bi-check-circle-fill me-2"></i> Verify &amp; Complete Transaction
         </button>
     </form>
@@ -86,47 +86,83 @@ document.addEventListener("DOMContentLoaded", function () {
     const timerDisplay = document.getElementById("countdownTimer");
     const resendBtn = document.getElementById("btnResendOtp");
     const resendCooldown = document.getElementById("resendCooldown");
+    const submitBtn = document.getElementById("btnSubmitModalOtp");
+    let isModalSubmitting = false;
 
     // Auto-advance OTP boxes
     boxes.forEach((box, index) => {
         box.addEventListener("input", function (e) {
+            const val = box.value.replace(/\D/g, "");
+            box.value = val ? val[0] : "";
             if (box.value.length === 1 && index < boxes.length - 1) {
                 boxes[index + 1].focus();
             }
-            updateCombined();
+            updateCombinedAndCheck();
         });
 
         box.addEventListener("keydown", function (e) {
             if (e.key === "Backspace" && box.value === "" && index > 0) {
                 boxes[index - 1].focus();
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                updateCombinedAndCheck();
             }
         });
 
         box.addEventListener("paste", function (e) {
             e.preventDefault();
-            const pasteData = (e.clipboardData || window.clipboardData).getData("text").trim();
-            if (/^\d{6}$/.test(pasteData)) {
+            const pasteData = (e.clipboardData || window.clipboardData).getData("text").trim().replace(/\D/g, "");
+            if (pasteData) {
                 pasteData.split("").forEach((char, i) => {
                     if (boxes[i]) boxes[i].value = char;
                 });
-                updateCombined();
-                boxes[5].focus();
+                updateCombinedAndCheck();
+                if (boxes[5]) boxes[5].focus();
             }
         });
     });
 
-    function updateCombined() {
+    function updateCombinedAndCheck() {
         let val = "";
         boxes.forEach(b => val += b.value);
         combinedInput.value = val;
+        if (val.length === 6 && !isModalSubmitting) {
+            submitModalForm();
+        }
+    }
+
+    function submitModalForm() {
+        if (isModalSubmitting) return;
+        isModalSubmitting = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...';
+        }
+        boxes.forEach(b => b.readOnly = true);
+        form.submit();
     }
 
     form.addEventListener("submit", function(e) {
-        updateCombined();
+        let val = "";
+        boxes.forEach(b => val += b.value);
+        combinedInput.value = val;
+
         if (combinedInput.value.length !== 6) {
             e.preventDefault();
             alert("Please enter the complete 6-digit OTP code.");
+            return false;
         }
+
+        if (isModalSubmitting) {
+            e.preventDefault();
+            return false;
+        }
+        isModalSubmitting = true;
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...';
+        }
+        boxes.forEach(b => b.readOnly = true);
     });
 
     // 2-Minute Expiry Timer

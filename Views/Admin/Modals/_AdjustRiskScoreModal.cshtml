@@ -1,0 +1,58 @@
+<!-- Modal: Manual Adjust Risk Score Box -->
+<div class="modal fade" id="adjustRiskScoreModal" tabindex="-1" aria-labelledby="adjustRiskScoreModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-2xl rounded-4 overflow-hidden" style="background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.35) !important;">
+            <div class="modal-header bg-dark text-white border-secondary-subtle px-4 py-3">
+                <h5 class="modal-title fw-bold" id="adjustRiskScoreModalLabel">
+                    <i class="bi bi-sliders text-warning me-2"></i> Adjust Security Risk Score
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-controller="Admin" asp-action="AdjustRiskScore" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="adjustRiskUserId" />
+                
+                <div class="modal-body p-4" style="background: #0f172a;">
+                    <div class="p-3 rounded-3 mb-3" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25);">
+                        <div class="small text-secondary text-uppercase fw-bold" style="letter-spacing: 0.5px;">Target User Account</div>
+                        <div class="fs-6 fw-bold text-white mt-0.5" id="adjustRiskUserName">User Name</div>
+                        <div class="small text-muted mt-0.5">Current Reputation Score: <span class="fw-bold text-warning" id="adjustRiskCurrentScore">0 pts</span></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">Points Adjustment (+/-)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-warning fw-bold">pts</span>
+                            <input type="number" name="pointsAdjustment" id="adjustRiskPointsInput" class="form-control form-control-lg fw-bold text-warning bg-dark border-secondary text-white" placeholder="e.g. +15 or -10" required />
+                        </div>
+                        <div class="form-text text-secondary small mt-1">
+                            Use positive numbers (e.g. <code>15</code>) to increase risk, or negative numbers (e.g. <code>-10</code>) to decrease risk.
+                        </div>
+                    </div>
+
+                    <!-- Quick Preset Point Buttons -->
+                    <div class="d-flex align-items-center gap-1.5 mb-3 flex-wrap">
+                        <span class="small text-muted me-1" style="font-size: 0.75rem;">Quick Presets:</span>
+                        <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2.5 rounded-pill small" onclick="setRiskAdjustmentPreset(15)">+15 pts (Penalty)</button>
+                        <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2.5 rounded-pill small" onclick="setRiskAdjustmentPreset(30)">+30 pts (Severe Penalty)</button>
+                        <button type="button" class="btn btn-xs btn-outline-success py-1 px-2.5 rounded-pill small" onclick="setRiskAdjustmentPreset(-10)">-10 pts (Reward)</button>
+                        <button type="button" class="btn btn-xs btn-outline-success py-1 px-2.5 rounded-pill small" onclick="setRiskAdjustmentPreset(-25)">-25 pts (Clear Anomaly)</button>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold text-secondary">Administrative Justification / Audit Note *</label>
+                        <textarea name="reason" id="adjustRiskReasonInput" class="form-control bg-dark border-secondary text-white" rows="3" placeholder="Enter mandatory reason for audit history (e.g. Manual override after identity verification)" required></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-dark border-secondary-subtle px-4 py-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm d-inline-flex align-items-center gap-2">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Apply Adjustment</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

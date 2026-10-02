@@ -23,6 +23,7 @@ namespace SmartBank.Data
         public DbSet<PendingTransaction> PendingTransactions { get; set; } = null!;
         public DbSet<TransferRequest> TransferRequests { get; set; } = null!;
         public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
+        public DbSet<RiskEvent> RiskEvents { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -41,10 +42,15 @@ namespace SmartBank.Data
                 entity.Property(u => u.IsEmailVerified).HasDefaultValue(false);
                 entity.Property(u => u.IsFirstLogin).HasDefaultValue(true);
                 entity.Property(u => u.FailedVaultAttempts).HasDefaultValue(0);
+                entity.Property(u => u.RiskScore).HasDefaultValue(0);
 
                 // Indexes and Uniqueness
                 entity.HasIndex(u => u.Username).IsUnique();
                 entity.HasIndex(u => u.Email).IsUnique();
+                entity.HasIndex(u => u.Status);
+                entity.HasIndex(u => u.Role);
+                entity.HasIndex(u => u.NidNumber);
+                entity.HasIndex(u => u.RiskScore);
             });
 
             // Account configuration
@@ -56,6 +62,8 @@ namespace SmartBank.Data
 
                 // Index and Uniqueness
                 entity.HasIndex(a => a.AccountNumber).IsUnique();
+                entity.HasIndex(a => a.UserId);
+                entity.HasIndex(a => a.IsActive);
 
                 // Relationship
                 entity.HasOne(a => a.User)
@@ -82,6 +90,12 @@ namespace SmartBank.Data
             {
                 entity.HasKey(t => t.Id);
                 entity.Property(t => t.Amount).HasColumnType("decimal(18,2)");
+
+                // Indexes
+                entity.HasIndex(t => t.AccountId);
+                entity.HasIndex(t => t.RelatedAccountId);
+                entity.HasIndex(t => t.Timestamp);
+                entity.HasIndex(t => t.Type);
 
                 // Relationship
                 entity.HasOne(t => t.Account)

@@ -1,0 +1,36 @@
+<!-- Admin Override Vault Password Modal (PART E) -->
+<div class="modal fade" id="overrideVaultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-2xl">
+            <div class="modal-header border-secondary-subtle">
+                <h5 class="modal-title fw-bold text-white">
+                    <i class="bi bi-shield-lock-fill text-warning me-2"></i> Override Vault Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-controller="Admin" asp-action="OverrideVaultPassword" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="overrideVaultUserId" />
+                <div class="modal-body p-4">
+                    <p class="small text-secondary mb-3">
+                        You are overriding the Security Vault password for <strong id="overrideVaultUserName" class="text-white">User</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary">New Vault Password</label>
+                        <input type="password" name="newVaultPassword" class="form-control" placeholder="Minimum 8 characters" required />
+                    </div>
+                    <div class="form-text text-secondary small">
+                        <i class="bi bi-info-circle me-1 text-info"></i>
+                        Password will be updated immediately in database.
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary-subtle">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">
+                        <i class="bi bi-check-circle-fill me-1"></i> Override Vault Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
