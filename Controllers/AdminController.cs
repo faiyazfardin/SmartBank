@@ -36,6 +36,13 @@ namespace SmartBank.Controllers
             _logger = logger;
         }
 
+        // GET: Admin/Chat
+        [HttpGet]
+        public IActionResult Chat()
+        {
+            return View();
+        }
+
         // GET: Admin/Users
         [HttpGet]
         public async Task<IActionResult> Users(string? search, string? roleFilter, string? statusFilter)

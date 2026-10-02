@@ -19,6 +19,9 @@ namespace SmartBank.Data
         public DbSet<PendingTransaction> PendingTransactions { get; set; } = null!;
         public DbSet<TransferRequest> TransferRequests { get; set; } = null!;
         public DbSet<OtpVerification> OtpVerifications { get; set; } = null!;
+        public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
+        public DbSet<ChatConversation> ChatConversations { get; set; } = null!;
+        public DbSet<ChatConnection> ChatConnections { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -230,6 +233,43 @@ namespace SmartBank.Data
                     .WithMany()
                     .HasForeignKey(o => o.UserId)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ChatConversation configuration
+            modelBuilder.Entity<ChatConversation>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.UserId).IsRequired().HasMaxLength(100);
+                entity.HasIndex(c => c.UserId).IsUnique();
+            });
+
+            // ChatMessage configuration
+            modelBuilder.Entity<ChatMessage>(entity =>
+            {
+                entity.HasKey(m => m.Id);
+                entity.Property(m => m.SenderId).IsRequired().HasMaxLength(100);
+                entity.Property(m => m.SenderRole).IsRequired().HasMaxLength(20);
+                entity.Property(m => m.AttachmentUrl).HasMaxLength(500);
+
+                entity.HasIndex(m => m.ConversationId);
+                entity.HasIndex(m => m.SentAt);
+
+                entity.HasOne(m => m.Conversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ChatConnection configuration
+            modelBuilder.Entity<ChatConnection>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.Property(c => c.UserId).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.ConnectionId).IsRequired().HasMaxLength(100);
+                entity.Property(c => c.Role).IsRequired().HasMaxLength(20);
+
+                entity.HasIndex(c => c.UserId);
+                entity.HasIndex(c => c.ConnectionId);
             });
         }
     }
