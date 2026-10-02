@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Container
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: smartbank-db
+    restart: always
+    environment:
+      POSTGRES_DB: SmartBankDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d SmartBankDb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # SmartBank Web Application Container
+  smartbank-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartbank-app
+    restart: always
+    ports:
+      - "5096:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=SmartBankDb;Username=postgres;Password=postgrespassword;
+      - Jwt__Key=SmartBank_Super_Secret_Key_For_JWT_Authentication_2026_Minimum_32_Chars!
+      - Jwt__Issuer=SmartBankAPI
+      - Jwt__Audience=SmartBankClient
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
