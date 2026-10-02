@@ -78,7 +78,7 @@
                             var isCredit = tx.Type == SmartBank.Entities.TransactionType.Deposit || tx.Type == SmartBank.Entities.TransactionType.TransferIn;
                             <tr>
                                 <td>
-                                    <span class="badge bg-light text-dark border font-monospace py-2 px-2">#TX-@tx.Id.ToString("D6")</span>
+                                    <span class="badge-tx-id">#TX-@tx.Id.ToString("D6")</span>
                                 </td>
                                 <td>
                                     @if (tx.Type == SmartBank.Entities.TransactionType.Deposit)
@@ -95,7 +95,7 @@
                                     }
                                     else if (tx.Type == SmartBank.Entities.TransactionType.TransferIn)
                                     {
-                                        <span class="badge bg-info-subtle text-info fw-bold py-1 px-2 rounded-pill">
+                                        <span class="badge-transfer-in">
                                             <i class="bi bi-arrow-down-left"></i> Transfer In
                                         </span>
                                     }

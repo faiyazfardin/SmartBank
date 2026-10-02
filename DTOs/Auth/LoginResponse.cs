@@ -14,5 +14,6 @@ namespace SmartBank.DTOs.Auth
         public string AccountNumber { get; set; } = string.Empty;
         public decimal Balance { get; set; } = 0.00m;
         public int ExpiresIn { get; set; } = 3600;
+        public bool HadFailedLoginAttempt { get; set; } = false;
     }
 }

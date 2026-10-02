@@ -10,7 +10,8 @@ namespace SmartBank.Entities
         Registration = 2,
         PasswordReset = 3,
         TransactionApproval = 4,
-        Login = 5
+        Login = 5,
+        VaultReset = 6
     }
 
     [Table("OtpVerifications")]

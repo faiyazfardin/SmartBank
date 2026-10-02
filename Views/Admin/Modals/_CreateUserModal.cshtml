@@ -1,0 +1,65 @@
+<!-- Modal 1: Create User -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="CreateUser" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="createUserModalLabel">
+                        <i class="bi bi-person-plus-fill text-primary me-2"></i> Create User
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Full Name *</label>
+                            <input type="text" name="fullName" class="form-control" placeholder="Full name" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Username *</label>
+                            <input type="text" name="username" class="form-control" placeholder="Username" required />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Email Address *</label>
+                            <input type="email" name="email" class="form-control" placeholder="email@domain.com" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Phone Number</label>
+                            <input type="tel" name="phoneNumber" class="form-control" placeholder="+880 1711-000000" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">NID Number</label>
+                            <input type="text" name="nidNumber" class="form-control" placeholder="National ID" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Role *</label>
+                            <select name="role" class="form-select" id="createRoleSelect" onchange="toggleInitialBalance(this.value)">
+                                <option value="Customer">Customer</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-secondary">Password *</label>
+                            <input type="password" name="password" class="form-control" placeholder="Min 8 chars" required />
+                        </div>
+                        <div class="col-md-6" id="initialBalanceContainer">
+                            <label class="form-label fw-semibold small text-secondary">Opening Balance (৳)</label>
+                            <input type="number" id="initialBalanceInput" name="initialBalance" class="form-control fw-bold text-success" value="1000.00" min="0" step="0.01" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

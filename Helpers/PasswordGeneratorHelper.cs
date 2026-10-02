@@ -47,5 +47,10 @@ namespace SmartBank.Helpers
 
             return new string(password);
         }
+
+        /// <summary>
+        /// Alias for GenerateSecurePassword guaranteed to contain uppercase, lowercase, digit, and special characters.
+        /// </summary>
+        public static string GenerateStrongPassword(int length = 10) => GenerateSecurePassword(length);
     }
 }

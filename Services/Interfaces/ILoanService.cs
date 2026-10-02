@@ -12,6 +12,13 @@ namespace SmartBank.Services.Interfaces
         Task<LoanApplicationDto?> GetApplicationByNumberAsync(int userId, string applicationNumber, bool isAdmin = false);
         Task<List<LoanApplicationDto>> GetAllApplicationsForAdminAsync(string? statusFilter = null);
         Task<(int StatusCode, ApiResponse<LoanApplicationDto> Response)> ReviewApplicationAsync(string applicationNumber, string adminUsername, bool isApprove, string comment);
+        Task<(int StatusCode, ApiResponse<LoanApplicationDto> Response)> ApproveLoanAsync(int applicationId, ApproveLoanDto dto, string adminUsername);
+        Task<(int StatusCode, ApiResponse<LoanApplicationDto> Response)> RejectLoanAsync(int applicationId, string adminNote, string adminUsername);
+        Task<(int StatusCode, ApiResponse<LoanPaymentDto> Response)> RecordPaymentAsync(RecordPaymentDto dto, string recordedBy);
+        Task<LoanDetailsDto?> GetLoanDetailsAsync(string applicationNumber, int requestingUserId, bool isAdmin = false);
+        Task<List<LoanInstallmentDto>> GetInstallmentsAsync(int applicationId);
+        Task<List<LoanPaymentDto>> GetAllPaymentsForAdminAsync();
+        Task<int> MarkOverdueInstallmentsAsync();
         Task<AdminLoanStatsDto> GetAdminLoanStatsAsync();
     }
 }

@@ -1,0 +1,42 @@
+<!-- Modal 3: Suspension Dialog -->
+<div class="modal fade" id="suspendModal" tabindex="-1" aria-labelledby="suspendModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form asp-controller="Admin" asp-action="SuspendUser" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="suspendUserId" name="userId" />
+
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold" id="suspendModalLabel">
+                        <i class="bi bi-shield-slash-fill me-2"></i> User Suspension
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="small text-secondary mb-3">
+                        Applying administrative suspension / lockout for <strong id="suspendUserName" class="text-white">User</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Action / Duration</label>
+                        <select name="suspensionType" class="form-select" id="selectSuspendType" required>
+                            <option value="1Hour">1 Hour Temporary Suspension</option>
+                            <option value="24Hours">24 Hours Security Hold</option>
+                            <option value="7Days">7 Days Investigation Hold</option>
+                            <option value="Permanent">Indefinite / Permanent Suspension</option>
+                            <option value="Lift">✅ Lift Suspension (Make Active)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Reason / Note</label>
+                        <textarea name="reason" class="form-control" rows="2" placeholder="e.g. KYC review, policy violation"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">Apply Action</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

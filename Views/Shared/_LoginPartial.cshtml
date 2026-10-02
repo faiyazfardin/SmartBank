@@ -50,19 +50,6 @@
                     </a>
                 </li>
             }
-            else
-            {
-                <li>
-                    <a class="dropdown-item py-2" asp-controller="Dashboard" asp-action="Index">
-                        <i class="bi bi-person-circle me-2 text-primary"></i> Account Dashboard
-                    </a>
-                </li>
-                <li>
-                    <a class="dropdown-item py-2" asp-controller="Transaction" asp-action="Statement">
-                        <i class="bi bi-file-earmark-text me-2 text-info"></i> Account Statement
-                    </a>
-                </li>
-            }
             <li><hr class="dropdown-divider bg-secondary"></li>
             <li>
                 <form asp-controller="Account" asp-action="Logout" method="post" class="px-2">

@@ -1,0 +1,13 @@
+.git
+.gitignore
+.vs
+.vscode
+bin
+obj
+out
+SmartBank.Client
+SmartBank.Tests
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+*.md

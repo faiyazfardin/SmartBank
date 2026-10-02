@@ -68,6 +68,7 @@
         const inputs = document.querySelectorAll('.otp-digit');
         const hiddenCode = document.getElementById('hiddenOtpCode');
         const form = document.getElementById('otpForm');
+        let isFormSubmitting = false;
 
         if (inputs.length > 0) inputs[0].focus();
 
@@ -78,12 +79,15 @@
                 if (val && idx < inputs.length - 1) {
                     inputs[idx + 1].focus();
                 }
-                syncOtp();
+                syncOtpAndCheck();
             });
 
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Backspace' && !input.value && idx > 0) {
                     inputs[idx - 1].focus();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    syncOtpAndCheck();
                 }
             });
 
@@ -94,21 +98,56 @@
                     for (let i = 0; i < inputs.length; i++) {
                         inputs[i].value = pasteData[i] || '';
                     }
-                    syncOtp();
-                    if (pasteData.length >= 6) {
-                        form.submit();
-                    }
+                    syncOtpAndCheck();
                 }
             });
         });
 
-        function syncOtp() {
+        function syncOtpAndCheck() {
             let fullCode = '';
             inputs.forEach(i => fullCode += i.value);
             hiddenCode.value = fullCode;
-            if (fullCode.length === 6) {
-                form.submit();
+            if (fullCode.length === 6 && !isFormSubmitting) {
+                submitOtpForm();
             }
+        }
+
+        function submitOtpForm() {
+            if (isFormSubmitting) return;
+            isFormSubmitting = true;
+            const btn = document.getElementById('btnSubmitOtp');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...';
+            }
+            inputs.forEach(i => i.readOnly = true);
+            form.submit();
+        }
+
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                let fullCode = '';
+                inputs.forEach(i => fullCode += i.value);
+                hiddenCode.value = fullCode;
+
+                if (fullCode.length !== 6) {
+                    e.preventDefault();
+                    alert('Please enter all 6 digits of the OTP code.');
+                    return false;
+                }
+
+                if (isFormSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isFormSubmitting = true;
+                const btn = document.getElementById('btnSubmitOtp');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...';
+                }
+                inputs.forEach(i => i.readOnly = true);
+            });
         }
 
         // 60-Second Cooldown Timer

@@ -23,6 +23,7 @@ namespace SmartBank.Services
         private readonly IEmailService _emailService;
         private readonly int _lockoutMinutes;
         private readonly int _maxFailedAttempts;
+        private readonly IRiskService _riskService;
 
         public AuthService(
             SmartBankDbContext context,
@@ -31,6 +32,7 @@ namespace SmartBank.Services
             IRefreshTokenService refreshTokenService,
             IOtpService otpService,
             IEmailService emailService,
+            IRiskService riskService,
             IConfiguration configuration)
         {
             _context = context;
@@ -39,6 +41,7 @@ namespace SmartBank.Services
             _refreshTokenService = refreshTokenService;
             _otpService = otpService;
             _emailService = emailService;
+            _riskService = riskService;
             _lockoutMinutes = int.TryParse(configuration["Security:LockoutMinutes"], out var lockout) ? lockout : 15;
             _maxFailedAttempts = int.TryParse(configuration["Security:MaxLoginAttempts"], out var maxAttempts) ? maxAttempts : 5;
         }
@@ -269,14 +272,20 @@ namespace SmartBank.Services
                 user.FailedLoginCount++;
                 user.UpdatedAt = DateTime.UtcNow;
 
-                if (user.FailedLoginCount >= _maxFailedAttempts)
+                // SCORING TRIGGER: Wrong login password +5 per attempt
+                await _riskService.RecordRiskEventAsync(user.Id, "WrongLoginPassword", 5, System.Text.Json.JsonSerializer.Serialize(new { ip = clientIp, failedAttempts = user.FailedLoginCount }));
+
+                if (user.FailedLoginCount >= _maxFailedAttempts || string.Equals(user.Status, "Suspended", StringComparison.OrdinalIgnoreCase))
                 {
-                    user.LockedUntil = DateTime.UtcNow.AddMinutes(_lockoutMinutes);
-                    await _context.SaveChangesAsync();
+                    if (!string.Equals(user.Status, "Suspended", StringComparison.OrdinalIgnoreCase))
+                    {
+                        user.LockedUntil = DateTime.UtcNow.AddMinutes(_lockoutMinutes);
+                        await _context.SaveChangesAsync();
+                    }
 
                     return (403, ApiResponse<LoginResponse>.FailureResponse(
-                        "Account temporarily locked",
-                        new List<string> { $"Too many failed attempts. Please try again in {_lockoutMinutes} minutes" }), _lockoutMinutes);
+                        "Account temporarily locked or suspended",
+                        new List<string> { $"Login access restricted due to security violations." }), _lockoutMinutes);
                 }
 
                 await _context.SaveChangesAsync();
@@ -286,6 +295,7 @@ namespace SmartBank.Services
             }
 
             // 5. Success: Reset failed attempts & lockout
+            bool hadFailedAttempts = user.FailedLoginCount > 0;
             user.FailedLoginCount = 0;
             user.LockedUntil = null;
             user.UpdatedAt = DateTime.UtcNow;
@@ -310,7 +320,8 @@ namespace SmartBank.Services
                 Role = user.Role,
                 AccountNumber = accountNumber,
                 Balance = balance,
-                ExpiresIn = _jwtService.GetExpiryMinutes() * 60
+                ExpiresIn = _jwtService.GetExpiryMinutes() * 60,
+                HadFailedLoginAttempt = hadFailedAttempts
             };
 
             return (200, ApiResponse<LoginResponse>.SuccessResponse(responseData, "Login successful"), null);
